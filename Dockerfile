@@ -1,7 +1,7 @@
 ﻿# Install uv
 FROM astral/uv:python3.13-bookworm-slim
 
-# Change the working directory to the `app` directory
+# Change the working directory to the `src` directory
 WORKDIR /app
 
 # Install dependencies

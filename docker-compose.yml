@@ -1,8 +1,16 @@
 ﻿services:
-  app:
+  api:
     build: .
     ports:
      - "8080:8080"
-    container_name: pidoras
     env_file:
       - .env
+
+  client-generator:
+    build: .
+    ports:
+      - "5672:5672"
+    command: uv run python -m src.workers.client_generator_worker
+    env_file:
+      - .env
+

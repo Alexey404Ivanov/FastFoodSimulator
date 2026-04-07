@@ -3,7 +3,10 @@ name = "fastfoodsimulator"
 version = "0.1.0"
 requires-python = "==3.13.*"
 dependencies = [
+    "aio-pika>=9.6.2",
+    "asyncio>=4.0.0",
     "fastapi>=0.135.3",
+    "jinja2>=3.1.6",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "uvicorn>=0.43.0",
@@ -14,4 +17,4 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D100", "D101", "D104"]
+ignore = ["D100", "D101", "D103", "D104", "D107"]
