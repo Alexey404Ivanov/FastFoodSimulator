@@ -18,3 +18,6 @@ class ClientArrivedEvent(BaseModel):
 
 class OrderCreatedEvent(BaseModel):
     order_id: int
+
+class OrderDoneEvent(BaseModel):
+    order_id: int

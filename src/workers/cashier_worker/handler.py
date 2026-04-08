@@ -46,6 +46,7 @@ class CashierHandler:
                 event = ClientArrivedEvent.model_validate_json(message.body.decode())
 
                 await self.client_queue.put(event.client_id)
+                self.logger.info(f"Client #{event.client_id} put to queue")
 
                 if self.work_task is None or self.work_task.done():
                     self.work_task = asyncio.create_task(self.work_loop())
@@ -66,16 +67,16 @@ class CashierHandler:
 
     async def work_loop(self):
         while True:
-            order_id = await self.client_queue.get()
+            if self.current_order_id is None:
+                self.current_order_id = await self.client_queue.get()
 
             started_at = monotonic()
 
             try:
                 await asyncio.sleep(self.remaining_time)
-
-                self.logger.info(f"Order #{order_id} created")
-                await self._publish(order_id)
-
+                self.logger.info(f"Order #{self.current_order_id} created")
+                await self._publish(self.current_order_id)
+                self.current_order_id = None
                 self.remaining_time = self.cashier_interval_seconds
 
             except asyncio.CancelledError:

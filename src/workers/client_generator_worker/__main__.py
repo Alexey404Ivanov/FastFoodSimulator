@@ -14,10 +14,7 @@ async def main():
     try:
         channel = await connection.channel()
 
-        queue = await channel.declare_queue(
-            "client_generator.control",
-            durable=True
-        )
+        queue = await channel.declare_queue("client_generator.queue", durable=False, auto_delete=True)
         exchange = await channel.declare_exchange(
             name="simulation.events.exchange",
             type=ExchangeType.TOPIC,
