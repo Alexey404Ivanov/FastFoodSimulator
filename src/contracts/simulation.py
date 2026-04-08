@@ -15,3 +15,6 @@ class SimulationContinuedEvent(BaseModel):
 
 class ClientArrivedEvent(BaseModel):
     client_id: int
+
+class OrderCreatedEvent(BaseModel):
+    order_id: int
