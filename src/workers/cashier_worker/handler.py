@@ -11,10 +11,12 @@ from src.contracts.simulation import (
     SimulationPausedEvent,
     SimulationStartedEvent,
 )
+from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 
 
 class CashierHandler:
     def __init__(self, exchange: AbstractRobustExchange):
+        self.redis_repo = SimulationStateRepository()
         self.exchange: AbstractRobustExchange = exchange
         self.logger = logging.getLogger("CashierHandler")
         self.client_queue = asyncio.Queue()
@@ -32,20 +34,25 @@ class CashierHandler:
                 event = SimulationStartedEvent.model_validate_json(
                     message.body.decode()
                 )
+                await self.redis_repo.set_status("running")
                 self.cashier_interval_seconds = event.cashier_interval_seconds
                 self.remaining_time = self.cashier_interval_seconds
 
             elif routing_key == "simulation.paused":
                 event = SimulationPausedEvent.model_validate_json(message.body.decode())
+                await self.redis_repo.set_status("paused")
                 await self.pause_work()
 
             elif routing_key == "simulation.continued":
+                await self.redis_repo.set_status("running")
                 await self.start_or_resume_work()
 
             elif routing_key == "client.arrived":
                 event = ClientArrivedEvent.model_validate_json(message.body.decode())
 
                 await self.client_queue.put(event.client_id)
+                await self.redis_repo.push_to_queue(worker_name="cashier", entity_id=event.client_id)
+
                 self.logger.info(f"Client #{event.client_id} put to queue")
 
                 if self.work_task is None or self.work_task.done():
@@ -69,6 +76,8 @@ class CashierHandler:
         while True:
             if self.current_order_id is None:
                 self.current_order_id = await self.client_queue.get()
+                await self.redis_repo.set_processing_entity(worker_name="cashier", entity_id=self.current_order_id)
+                await self.redis_repo.pop_to_queue(worker_name="cashier")
 
             started_at = monotonic()
 
@@ -76,6 +85,7 @@ class CashierHandler:
                 await asyncio.sleep(self.remaining_time)
                 self.logger.info(f"Order #{self.current_order_id} created")
                 await self._publish(self.current_order_id)
+                await self.redis_repo.set_worker_waiting(worker_name="cashier")
                 self.current_order_id = None
                 self.remaining_time = self.cashier_interval_seconds
 
