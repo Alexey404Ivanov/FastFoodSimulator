@@ -22,7 +22,7 @@ class SimulationStateLifecycle:
         redis = RedisProvider.get_client()
         pipe = redis.pipeline()
 
-        pipe.delete(f"simulation:{simulation_id}:status")
-        pipe.delete(f"simulation:{simulation_id}:cashier_doing")
+        pipe.delete(f"simulation:{simulation_id}")
+        pipe.delete(f"simulation:{simulation_id}:cashier_queue")
 
         await pipe.execute()

@@ -77,7 +77,7 @@ class CashierHandler:
             if self.current_order_id is None:
                 self.current_order_id = await self.client_queue.get()
                 await self.redis_repo.set_processing_entity(worker_name="cashier", entity_id=self.current_order_id)
-                await self.redis_repo.pop_to_queue(worker_name="cashier")
+                await self.redis_repo.pop_from_queue(worker_name="cashier")
 
             started_at = monotonic()
 

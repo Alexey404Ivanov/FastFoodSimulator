@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Food Simulator</title>
+    <link rel="stylesheet" href="../static/css/home.css">
+</head>
+<body>
+    <header class="page-header">
+        <img src="../static/images/logo(1).png" alt="Логотип Fast Food Simulator">
+    </header>
+
+    <main class="page-content">
+        <section class="simulation-card">
+            <h1>Укажите данные симуляции</h1>
+            <p>Введите числовые интервалы и выберите единицу времени для каждого этапа.</p>
+
+            <form class="simulation-form" id="simulationForm">
+                <div class="field-group">
+                    <label for="arrivalInterval">Интервал прибытия клиентов</label>
+                    <div class="field-control">
+                        <input id="arrivalInterval" name="arrival_interval" type="number" min="0" step="1" placeholder="Введите число" required>
+                        <select id="arrivalUnit" name="arrival_unit" aria-label="Единица времени для прибытия клиентов">
+                            <option value="min">мин.</option>
+                            <option value="sec">сек.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label for="orderInterval">Интервал оформления заказа</label>
+                    <div class="field-control">
+                        <input id="orderInterval" name="order_interval" type="number" min="0" step="1" placeholder="Введите число" required>
+                        <select id="orderUnit" name="order_unit" aria-label="Единица времени для оформления заказа">
+                            <option value="min">мин.</option>
+                            <option value="sec">сек.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label for="cookingInterval">Интервал готовки заказа</label>
+                    <div class="field-control">
+                        <input id="cookingInterval" name="cooking_interval" type="number" min="0" step="1" placeholder="Введите число" required>
+                        <select id="cookingUnit" name="cooking_unit" aria-label="Единица времени для готовки заказа">
+                            <option value="min">мин.</option>
+                            <option value="sec">сек.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label for="pickupInterval">Интервал выдачи заказа</label>
+                    <div class="field-control">
+                        <input id="pickupInterval" name="pickup_interval" type="number" min="0" step="1" placeholder="Введите число" required>
+                        <select id="pickupUnit" name="pickup_unit" aria-label="Единица времени для выдачи заказа">
+                            <option value="min">мин.</option>
+                            <option value="sec">сек.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="submit-button" type="submit">Запустить симуляцию</button>
+            </form>
+        </section>
+    </main>
+
+    <script src="../static/js/home.js"></script>
+</body>
+</html>

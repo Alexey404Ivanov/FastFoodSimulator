@@ -32,7 +32,7 @@ class SimulationStateRepository:
 
         await self.redis.rpush(f"simulation:{1488}:{worker_name}_queue", entity_id)
 
-    async def pop_to_queue(self, worker_name: str):
+    async def pop_from_queue(self, worker_name: str):
         if worker_name not in self.QUEUE_NAMES:
             return ###
 

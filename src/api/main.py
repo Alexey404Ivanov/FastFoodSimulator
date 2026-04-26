@@ -1,13 +1,13 @@
-﻿from contextlib import asynccontextmanager, contextmanager
+﻿from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from src.api.dependencies import publisher
 from src.api.routes import router as api_router
-
-from src.infrastructure.redis.provider import RedisProvider
 from src.infrastructure.redis.lifecycle import SimulationStateLifecycle
+from src.infrastructure.redis.provider import RedisProvider
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,5 +24,4 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
-
 app.include_router(api_router)
