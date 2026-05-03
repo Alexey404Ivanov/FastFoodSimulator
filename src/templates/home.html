@@ -8,7 +8,7 @@
 </head>
 <body>
     <header class="page-header">
-        <img src="../static/images/logo(1).png" alt="Логотип Fast Food Simulator">
+<!--        <img src="../static/images/logo(1).png" alt="Логотип Fast Food Simulator">-->
     </header>
 
     <main class="page-content">
@@ -20,44 +20,48 @@
                 <div class="field-group">
                     <label for="arrivalInterval">Интервал прибытия клиентов</label>
                     <div class="field-control">
-                        <input id="arrivalInterval" name="arrival_interval" type="number" min="0" step="1" placeholder="Введите число" required>
-                        <select id="arrivalUnit" name="arrival_unit" aria-label="Единица времени для прибытия клиентов">
-                            <option value="min">мин.</option>
-                            <option value="sec">сек.</option>
-                        </select>
+                        <input id="arrivalInterval" name="client_interval_seconds" type="number" min="0" step="1" placeholder="Введите число" required>
+<!--                        <select id="arrivalUnit" name="arrival_unit" aria-label="Единица времени для прибытия клиентов">-->
+<!--                            <option value="min">мин.</option>-->
+<!--                            <option value="sec">сек.</option>-->
+<!--                        </select>-->
+                        <span>сек.</span>
                     </div>
                 </div>
 
                 <div class="field-group">
                     <label for="orderInterval">Интервал оформления заказа</label>
                     <div class="field-control">
-                        <input id="orderInterval" name="order_interval" type="number" min="0" step="1" placeholder="Введите число" required>
-                        <select id="orderUnit" name="order_unit" aria-label="Единица времени для оформления заказа">
-                            <option value="min">мин.</option>
-                            <option value="sec">сек.</option>
-                        </select>
+                        <input id="orderInterval" name="cashier_interval_seconds" type="number" min="0" step="1" placeholder="Введите число" required>
+<!--                        <select id="orderUnit" name="order_unit" aria-label="Единица времени для оформления заказа">-->
+<!--                            <option value="min">мин.</option>-->
+<!--                            <option value="sec">сек.</option>-->
+<!--                        </select>-->
+                        <span>сек.</span>
                     </div>
                 </div>
 
                 <div class="field-group">
                     <label for="cookingInterval">Интервал готовки заказа</label>
                     <div class="field-control">
-                        <input id="cookingInterval" name="cooking_interval" type="number" min="0" step="1" placeholder="Введите число" required>
-                        <select id="cookingUnit" name="cooking_unit" aria-label="Единица времени для готовки заказа">
-                            <option value="min">мин.</option>
-                            <option value="sec">сек.</option>
-                        </select>
+                        <input id="cookingInterval" name="kitchen_interval_seconds" type="number" min="0" step="1" placeholder="Введите число" required>
+<!--                        <select id="cookingUnit" name="cooking_unit" aria-label="Единица времени для готовки заказа">-->
+<!--                            <option value="min">мин.</option>-->
+<!--                            <option value="sec">сек.</option>-->
+<!--                        </select>-->
+                        <span>сек.</span>
                     </div>
                 </div>
 
                 <div class="field-group">
                     <label for="pickupInterval">Интервал выдачи заказа</label>
                     <div class="field-control">
-                        <input id="pickupInterval" name="pickup_interval" type="number" min="0" step="1" placeholder="Введите число" required>
-                        <select id="pickupUnit" name="pickup_unit" aria-label="Единица времени для выдачи заказа">
-                            <option value="min">мин.</option>
-                            <option value="sec">сек.</option>
-                        </select>
+                        <input id="pickupInterval" name="waiter_interval_seconds" type="number" min="0" step="1" placeholder="Введите число" required>
+<!--                        <select id="pickupUnit" name="pickup_unit" aria-label="Единица времени для выдачи заказа">-->
+<!--                            <option value="min">мин.</option>-->
+<!--                            <option value="sec">сек.</option>-->
+<!--                        </select>-->
+                        <span>сек.</span>
                     </div>
                 </div>
 

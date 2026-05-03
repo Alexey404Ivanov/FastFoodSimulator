@@ -1,13 +1,52 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симуляция</title>
+    <link rel="stylesheet" href="../static/css/simulation_1488.css">
 </head>
 <body>
-    <div>
-        <h1>Привет!</h1>
+    <div class="screen-frame" aria-hidden="true"></div>
+
+    <div class="floating-controls">
+        <button class="control-button" type="button">Старт</button>
+        <button class="control-button control-button-stop" type="button">Стоп</button>
+        <div class="timer-display">Время работы симуляции: 00.00</div>
     </div>
+
+    <header class="page-header">
+    </header>
+
+    <main class="page-content">
+        <section class="worker-tree" aria-label="Схема воркеров">
+            <div class="worker-node worker-node-root">
+                <img src="../static/images/workers/kitchen.svg" alt="Kitchen worker">
+            </div>
+
+            <div class="worker-children">
+                <div class="worker-node worker-node-cashier">
+                    <img src="../static/images/workers/cashier.svg" alt="Cashier worker">
+                    <div class="cashier-state">
+                        <div class="cashier-current">
+<!--                            <div class="cashier-label">Текущий клиент</div>-->
+                            <div class="client-slot" id="cashierCurrentClient"></div>
+                        </div>
+
+                        <div class="cashier-queue">
+<!--                            <div class="cashier-label">Очередь</div>-->
+                            <div class="client-queue" id="cashierQueue"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="worker-node">
+                    <img src="../static/images/workers/waiter.svg" alt="Waiter worker">
+                </div>
+            </div>
+        </section>
+    </main>
+
     <script src="../static/js/simulation_1488.js"></script>
 </body>
 </html>

@@ -1,4 +1,6 @@
-﻿from src.infrastructure.redis.provider import RedisProvider
+﻿import json
+
+from src.infrastructure.redis.provider import RedisProvider
 
 
 class SimulationStateRepository:
@@ -9,37 +11,81 @@ class SimulationStateRepository:
     def __init__(self):
         self.redis = RedisProvider.get_client()
 
-    async def get_state(self, simulation_id: int):
-        sim_key = f"simulation:{simulation_id}"
-        queue_key = f"simulation:{simulation_id}:cashier_queue"
+    async def get_state(self):
+        data = await self.redis.get(f"simulation:{1488}:state")
+        return json.loads(data)
 
-        simulation = await self.redis.hgetall(sim_key)
-        queue = await self.redis.lrange(queue_key, 0, -1)
-
-        simulation["cashier_queue"] = queue
-
-        return simulation
+    async def _set_state(self, state: dict):
+        await self.redis.set(f"simulation:{1488}:state", json.dumps(state))
 
     async def set_status(self, status: str):
         if status not in self.STATUSES:
-            return ###
+            return
 
-        await self.redis.hset(f"simulation:{1488}", "status", status)
+        state = await self.get_state()
+        state["status"] = status
+
+        await self._set_state(state)
+
+        await self.redis.publish(
+            f"simulation:{1488}:events",
+            json.dumps({"type": "simulation_status_changed", "data": {"status": status}}),
+        )
 
     async def push_to_queue(self, worker_name: str, entity_id: int):
         if worker_name not in self.QUEUE_NAMES:
-            return ###
+            return
 
-        await self.redis.rpush(f"simulation:{1488}:{worker_name}_queue", entity_id)
+        state = await self.get_state()
+
+        state[worker_name]["queue"].append(str(entity_id))
+
+        await self._set_state(state)
+
+        await self.redis.publish(
+            f"simulation:{1488}:events",
+            json.dumps({"type": f"pushed_to_{worker_name}_queue", "data": {"queue": state[worker_name]["queue"]}}),
+        )
 
     async def pop_from_queue(self, worker_name: str):
         if worker_name not in self.QUEUE_NAMES:
-            return ###
+            return
 
-        await self.redis.lpop(f"simulation:{1488}:{worker_name}_queue")
+        state = await self.get_state()
+
+        if not state[worker_name]["queue"]:
+            return None
+
+        entity_id = state[worker_name]["queue"].pop(0)
+
+        await self._set_state(state)
+
+        await self.redis.publish(
+            f"simulation:{1488}:events",
+            json.dumps({"type": f"popped_from_{worker_name}_queue", "data": {"queue": state[worker_name]["queue"]}}),
+        )
+
+        return entity_id
 
     async def set_worker_waiting(self, worker_name: str):
-        await self.redis.hset(f"simulation:{1488}",f"{worker_name}_doing", "")
+        state = await self.get_state()
+
+        state[worker_name]["doing"] = None
+
+        await self._set_state(state)
+
+        await self.redis.publish(
+            f"simulation:{1488}:events", json.dumps({"type": f"{worker_name}_waiting", "data": {}})
+        )
 
     async def set_processing_entity(self, worker_name: str, entity_id: int):
-        await self.redis.hset(f"simulation:{1488}",f"{worker_name}_doing", str(entity_id))
+        state = await self.get_state()
+
+        state[worker_name]["doing"] = str(entity_id)
+
+        await self._set_state(state)
+
+        await self.redis.publish(
+            f"simulation:{1488}:events",
+            json.dumps({"type": f"{worker_name}_started_processing", "data": {"entity_id": str(entity_id)}}),
+        )

@@ -5,17 +5,17 @@
             font-style: normal;
         }
         :root {
-            --page-bg: #050505;
-            --header-bg: #ffffff;
-            --card-bg: rgba(18, 18, 18, 0.92);
-            --card-border: rgba(255, 255, 255, 0.12);
-            --text-main: #f5f5f5;
-            --text-muted: #b8b8b8;
-            --accent: #ffb347;
-            --accent-strong: #ff8c42;
-            --field-bg: rgba(255, 255, 255, 0.06);
-            --field-border: rgba(255, 255, 255, 0.18);
-            --field-focus: rgba(255, 179, 71, 0.7);
+            --page-bg: #c82469;
+            --header-bg: #623387;
+            --card-bg:  #d75585;
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-main: #fff4fa;
+            --text-muted: rgba(255, 244, 250, 0.82);
+            --accent: #fff4fa;
+            --accent-strong: #ffd9ea;
+            --field-bg: rgba(255, 244, 250, 0.14);
+            --field-border: rgba(255, 244, 250, 0.28);
+            --field-focus: rgba(255, 244, 250, 0.34);
         }
 
         * {
@@ -27,8 +27,8 @@
             min-height: 100vh;
             font-family: "Yandex Sans Text Regular", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             background:
-                radial-gradient(circle at top, rgba(255, 179, 71, 0.12), transparent 28%),
-                linear-gradient(180deg, #111111 0%, var(--page-bg) 28%, #000000 100%);
+                radial-gradient(circle at top, rgba(255, 244, 250, 0.18), transparent 30%),
+                linear-gradient(180deg, #ee7aa4 0%, var(--page-bg) 32%, #bc3f6f 100%);
             color: var(--text-main);
         }
 
@@ -36,10 +36,10 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 108px;
-            padding: 20px 16px;
+            min-height: 72px;
+            padding: 12px 16px;
             background: var(--header-bg);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+            box-shadow: 0 8px 24px rgba(47, 18, 67, 0.28);
         }
 
         .page-header img {
@@ -61,8 +61,7 @@
             border: 1px solid var(--card-border);
             border-radius: 24px;
             background: var(--card-bg);
-            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
-            backdrop-filter: blur(12px);
+            box-shadow: 0 24px 60px rgba(98, 51, 135, 0.24);
         }
 
         .simulation-card h1 {
@@ -97,8 +96,9 @@
 
         .field-control {
             display: grid;
-            grid-template-columns: 1fr 118px;
+            grid-template-columns: 1fr 92px;
             gap: 12px;
+            align-items: center;
         }
 
         .field-control input,
@@ -111,17 +111,41 @@
             padding: 14px 16px;
             font-size: 15px;
             outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
         }
 
         .field-control input::placeholder {
-            color: #8d8d8d;
+            color: rgba(255, 244, 250, 0.62);
+        }
+
+        .field-control input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .field-control input[type="number"]::-webkit-outer-spin-button,
+        .field-control input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .field-control select {
+            appearance: none;
+            min-height: 48px;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            background:
+                linear-gradient(135deg, rgba(255, 244, 250, 0.1), rgba(255, 244, 250, 0.06)),
+                var(--card-bg);
+            cursor: pointer;
         }
 
         .field-control input:focus,
         .field-control select:focus {
             border-color: var(--field-focus);
-            box-shadow: 0 0 0 4px rgba(255, 179, 71, 0.14);
+            box-shadow: 0 0 0 4px rgba(255, 244, 250, 0.16);
             transform: translateY(-1px);
         }
 
@@ -132,7 +156,7 @@
             padding: 15px 20px;
             font-size: 16px;
             font-weight: 700;
-            color: #1a1a1a;
+            color: #623387;
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
             cursor: pointer;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -140,7 +164,7 @@
 
         .submit-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 16px 30px rgba(255, 140, 66, 0.28);
+            box-shadow: 0 16px 30px rgba(98, 51, 135, 0.24);
         }
 
         .submit-button:active {
@@ -158,7 +182,7 @@
             }
 
             .page-header {
-                min-height: 92px;
+                min-height: 60px;
             }
 
             .page-header img {
