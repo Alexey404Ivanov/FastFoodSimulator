@@ -81,7 +81,7 @@ class SimulationStateRepository:
     #         })
     #     )
 
-        return entity_id
+        # return entity_id
 
     async def set_worker_finished_job(self, worker_name: str):
         state = await self.get_state()

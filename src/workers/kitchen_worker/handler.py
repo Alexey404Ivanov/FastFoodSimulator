@@ -62,6 +62,9 @@ class KitchenWorker:
         )
 
     async def pause_work(self):
+        if self.work_task is None:
+            self.logger.info(f"Pause non-working kitchen")
+            return
         self.work_task.cancel()
         try:
             await self.work_task
