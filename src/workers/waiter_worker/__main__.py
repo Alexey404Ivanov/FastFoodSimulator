@@ -4,9 +4,8 @@ import logging
 import aio_pika
 from aio_pika import ExchangeType
 
-from src.workers.kitchen_worker.handler import KitchenWorker
+from src.workers.waiter_worker.handler import WaiterHandler
 from src.infrastructure.redis.provider import RedisProvider
-
 
 async def main():
     await RedisProvider.init("redis://localhost:6379/0")
@@ -16,21 +15,22 @@ async def main():
     try:
         channel = await connection.channel()
 
-        queue = await channel.declare_queue("kitchen.queue", durable=False, auto_delete=True)
+        queue = await channel.declare_queue("waiter.queue", durable=False, auto_delete=True)
         exchange = await channel.declare_exchange(
             name="simulation.events.exchange",
             type=ExchangeType.TOPIC,
             durable=True
         )
-        handler = KitchenWorker(exchange)
+        handler = WaiterHandler(exchange)
 
-        await queue.bind(exchange, "order.created")
+        await queue.bind(exchange, "order.done")
         await queue.bind(exchange, "simulation.*")
         await queue.consume(handler.handle_message)
 
         await asyncio.Future()
 
     finally:
+        await RedisProvider.close()
         await connection.close()
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
     --header-bg: #623387;
     --text-main: #fff4fa;
     --text-muted: rgba(255, 244, 250, 0.82);
+    --worker-scale: 0.67;
 }
 
 * {
@@ -140,25 +141,29 @@ body {
     width: min(100%, 1800px);
     display: grid;
     justify-items: center;
-    gap: 92px;
+    gap: calc(92px * var(--worker-scale));
 }
 
 .worker-children {
     width: min(100%, 1480px);
     display: grid;
     grid-template-columns: repeat(2, minmax(360px, 1fr));
-    gap: 200px;
+    gap: calc(200px * var(--worker-scale));
     align-items: start;
 }
 
 .worker-node {
     display: grid;
     justify-items: center;
-    gap: 20px;
+    gap: calc(20px * var(--worker-scale));
+}
+
+.worker-node-root {
+    gap: calc(28px * var(--worker-scale));
 }
 
 .worker-node img {
-    width: clamp(320px, 34vw, 480px);
+    width: clamp(calc(320px * var(--worker-scale)), calc(34vw * var(--worker-scale)), calc(480px * var(--worker-scale)));
     height: auto;
     display: block;
     filter:
@@ -166,27 +171,84 @@ body {
         drop-shadow(0 2px 0 rgba(255, 255, 255, 0.22));
 }
 
-.worker-node-cashier {
+.worker-node-cashier,
+.worker-node-waiter {
     align-content: start;
 }
 
-.cashier-state {
-    width: min(100%, 520px);
+.kitchen-state {
+    width: min(100%, 1320px);
     display: grid;
-    gap: 28px;
-    margin-top: 12px;
+    gap: calc(16px * var(--worker-scale));
+    justify-items: center;
 }
 
-.cashier-current,
-.cashier-queue {
+.ticket-line {
+    width: 100%;
+    min-height: calc(126px * var(--worker-scale));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    gap: calc(18px * var(--worker-scale));
+}
+
+.ticket-line-doing {
+    min-height: calc(138px * var(--worker-scale));
+}
+
+.ticket-card {
     display: grid;
     justify-items: center;
-    gap: 14px;
+    gap: calc(10px * var(--worker-scale));
 }
 
-.cashier-label {
+.ticket-card-number {
     color: #ffffff;
-    font-size: 28px;
+    font-size: calc(24px * var(--worker-scale));
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ticket-card img {
+    width: calc(92px * var(--worker-scale));
+    height: auto;
+    display: block;
+    filter:
+        drop-shadow(0 12px 24px rgba(98, 51, 135, 0.2))
+        drop-shadow(0 2px 0 rgba(255, 255, 255, 0.18));
+}
+
+.ticket-card-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(82px * var(--worker-scale));
+    padding: 0 calc(22px * var(--worker-scale));
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    color: rgba(255, 244, 250, 0.78);
+    background: rgba(255, 244, 250, 0.06);
+    font-size: calc(18px * var(--worker-scale));
+}
+
+.worker-state {
+    width: min(100%, calc(520px * var(--worker-scale)));
+    display: grid;
+    gap: calc(28px * var(--worker-scale));
+    margin-top: calc(12px * var(--worker-scale));
+}
+
+.worker-current,
+.worker-queue {
+    display: grid;
+    justify-items: center;
+    gap: calc(14px * var(--worker-scale));
+}
+
+.worker-label {
+    color: #ffffff;
+    font-size: calc(28px * var(--worker-scale));
     font-weight: 700;
     text-align: center;
 }
@@ -194,23 +256,44 @@ body {
 .client-slot,
 .client-queue {
     width: 100%;
-    min-height: 120px;
+    min-height: calc(120px * var(--worker-scale));
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: flex-start;
-    gap: 18px;
-    padding: 14px 0 4px;
+    gap: calc(18px * var(--worker-scale));
+    padding: calc(14px * var(--worker-scale)) 0 calc(4px * var(--worker-scale));
 }
 
 .client-card {
     display: grid;
     justify-items: center;
-    gap: 8px;
+    gap: calc(8px * var(--worker-scale));
+}
+
+.client-card-arriving {
+    opacity: 0;
+    transform: translateY(calc(-36px * var(--worker-scale))) scale(0.82);
+    animation: client-arrive 1s ease forwards;
+}
+
+.client-card-travel {
+    position: fixed;
+    z-index: 20;
+    pointer-events: none;
+    margin: 0;
+    animation: none;
+}
+
+.client-card-number {
+    color: #ffffff;
+    font-size: calc(22px * var(--worker-scale));
+    font-weight: 700;
+    line-height: 1;
 }
 
 .client-card img {
-    width: 92px;
+    width: calc(92px * var(--worker-scale));
     height: auto;
     display: block;
     filter:
@@ -220,7 +303,7 @@ body {
 
 .client-card span {
     color: var(--text-main);
-    font-size: 18px;
+    font-size: calc(18px * var(--worker-scale));
     font-weight: 700;
 }
 
@@ -228,33 +311,54 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 96px;
-    padding: 0 24px;
+    min-height: calc(96px * var(--worker-scale));
+    padding: 0 calc(24px * var(--worker-scale));
     border: 1px solid rgba(255, 255, 255, 0.24);
     border-radius: 999px;
     color: var(--text-muted);
-    font-size: 20px;
+    font-size: calc(20px * var(--worker-scale));
     text-align: center;
     background: rgba(255, 244, 250, 0.06);
 }
 
+@keyframes client-arrive {
+    0% {
+        opacity: 0;
+        transform: translateY(calc(-36px * var(--worker-scale))) scale(0.82);
+    }
+
+    65% {
+        opacity: 1;
+        transform: translateY(calc(6px * var(--worker-scale))) scale(1.03);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 @media (max-width: 1200px) {
     .worker-tree {
-        gap: 72px;
+        gap: calc(72px * var(--worker-scale));
     }
 
     .worker-children {
         width: min(100%, 1080px);
         grid-template-columns: repeat(2, minmax(280px, 1fr));
-        gap: 96px;
+        gap: calc(96px * var(--worker-scale));
     }
 
     .worker-node img {
-        width: clamp(240px, 32vw, 360px);
+        width: clamp(calc(240px * var(--worker-scale)), calc(32vw * var(--worker-scale)), calc(360px * var(--worker-scale)));
     }
 
-    .cashier-label {
-        font-size: 24px;
+    .worker-label {
+        font-size: calc(24px * var(--worker-scale));
+    }
+
+    .ticket-card-number {
+        font-size: calc(22px * var(--worker-scale));
     }
 }
 
@@ -276,21 +380,25 @@ body {
     }
 
     .worker-tree {
-        gap: 48px;
+        gap: calc(48px * var(--worker-scale));
     }
 
     .worker-children {
         width: 100%;
         grid-template-columns: 1fr;
-        gap: 60px;
+        gap: calc(60px * var(--worker-scale));
     }
 
     .worker-node img {
-        width: clamp(220px, 60vw, 360px);
+        width: clamp(calc(220px * var(--worker-scale)), calc(60vw * var(--worker-scale)), calc(360px * var(--worker-scale)));
     }
 
-    .cashier-state {
-        width: min(100%, 420px);
+    .worker-state {
+        width: min(100%, calc(420px * var(--worker-scale)));
+    }
+
+    .kitchen-state {
+        width: 100%;
     }
 }
 
@@ -314,22 +422,35 @@ body {
     }
 
     .worker-tree {
-        gap: 40px;
+        gap: calc(40px * var(--worker-scale));
     }
 
-    .cashier-label {
-        font-size: 20px;
+    .ticket-line {
+        min-height: calc(104px * var(--worker-scale));
+        gap: calc(12px * var(--worker-scale));
+    }
+
+    .ticket-card img {
+        width: calc(72px * var(--worker-scale));
+    }
+
+    .ticket-card-number {
+        font-size: calc(18px * var(--worker-scale));
     }
 
     .client-card img {
-        width: 72px;
+        width: calc(72px * var(--worker-scale));
+    }
+
+    .client-card-number {
+        font-size: calc(18px * var(--worker-scale));
     }
 
     .client-card span {
-        font-size: 16px;
+        font-size: calc(16px * var(--worker-scale));
     }
 
     .client-card-empty {
-        font-size: 17px;
+        font-size: calc(17px * var(--worker-scale));
     }
 }

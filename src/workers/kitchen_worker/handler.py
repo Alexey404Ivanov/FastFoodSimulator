@@ -12,9 +12,11 @@ from src.contracts.simulation import (
     SimulationStartedEvent,
 )
 
+from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 
 class KitchenWorker:
     def __init__(self, exchange: AbstractRobustExchange):
+        self.redis_repo = SimulationStateRepository()
         self.exchange: AbstractRobustExchange = exchange
         self.logger = logging.getLogger("KitchenWorker")
         self.order_queue = asyncio.Queue()
@@ -34,7 +36,6 @@ class KitchenWorker:
                 )
                 self.kitchen_interval_seconds = event.kitchen_interval_seconds
                 self.remaining_time = self.kitchen_interval_seconds
-                # await self.start_or_resume_work()
 
             elif routing_key == "simulation.paused":
                 event = SimulationPausedEvent.model_validate_json(message.body.decode())
@@ -47,6 +48,9 @@ class KitchenWorker:
                 event = OrderCreatedEvent.model_validate_json(message.body.decode())
 
                 await self.order_queue.put(event.order_id)
+                await self.redis_repo.push_to_worker_queue(worker_name="kitchen", entity_id=event.order_id)
+
+                self.logger.info(f"Order #{event.order_id} put in queue")
 
                 if self.work_task is None or self.work_task.done():
                     self.work_task = asyncio.create_task(self.work_loop())
@@ -69,6 +73,7 @@ class KitchenWorker:
         while True:
             if self.current_order_id is None:
                 self.current_order_id = await self.order_queue.get()
+                await self.redis_repo.set_worker_starting_job(worker_name="kitchen")
 
             started_at = monotonic()
 
@@ -77,6 +82,7 @@ class KitchenWorker:
 
                 self.logger.info(f"Order #{self.current_order_id} done")
                 await self._publish(self.current_order_id)
+                await self.redis_repo.set_worker_finished_job(worker_name="kitchen")
                 self.current_order_id = None
                 self.remaining_time = self.kitchen_interval_seconds
 

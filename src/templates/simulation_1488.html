@@ -21,27 +21,38 @@
     <main class="page-content">
         <section class="worker-tree" aria-label="Схема воркеров">
             <div class="worker-node worker-node-root">
+                <div class="kitchen-state">
+                    <div class="ticket-line ticket-line-queue" id="kitchenQueue"></div>
+                    <div class="ticket-line ticket-line-doing" id="kitchenDoing"></div>
+                </div>
                 <img src="../static/images/workers/kitchen.svg" alt="Kitchen worker">
             </div>
 
             <div class="worker-children">
                 <div class="worker-node worker-node-cashier">
                     <img src="../static/images/workers/cashier.svg" alt="Cashier worker">
-                    <div class="cashier-state">
-                        <div class="cashier-current">
-<!--                            <div class="cashier-label">Текущий клиент</div>-->
+                    <div class="worker-state">
+                        <div class="worker-current">
                             <div class="client-slot" id="cashierCurrentClient"></div>
                         </div>
 
-                        <div class="cashier-queue">
-<!--                            <div class="cashier-label">Очередь</div>-->
+                        <div class="worker-queue">
                             <div class="client-queue" id="cashierQueue"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="worker-node">
+                <div class="worker-node worker-node-waiter">
                     <img src="../static/images/workers/waiter.svg" alt="Waiter worker">
+                    <div class="worker-state">
+                        <div class="worker-current">
+                            <div class="client-slot" id="waiterCurrentClient"></div>
+                        </div>
+
+                        <div class="worker-queue">
+                            <div class="client-queue" id="waiterQueue"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

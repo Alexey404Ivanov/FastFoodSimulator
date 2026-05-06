@@ -7,7 +7,6 @@ from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
 from src.contracts.simulation import ClientArrivedEvent, SimulationPausedEvent, SimulationStartedEvent
 
-
 class ClientGeneratorHandler:
     def __init__(self, exchange: AbstractRobustExchange):
         self.exchange: AbstractRobustExchange = exchange

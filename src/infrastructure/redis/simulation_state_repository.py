@@ -5,7 +5,7 @@ from src.infrastructure.redis.provider import RedisProvider
 
 class SimulationStateRepository:
     STATUSES = {"running", "paused"}
-    QUEUE_NAMES = {"cashier", "kitchen", "waiter", "client"}
+    QUEUE_NAMES = {"cashier", "kitchen", "waiter"}
     WORKERS_NAMES = {"cashier", "kitchen", "waiter"}
 
     def __init__(self):
@@ -29,10 +29,15 @@ class SimulationStateRepository:
 
         await self.redis.publish(
             f"simulation:{1488}:events",
-            json.dumps({"type": "simulation_status_changed", "data": {"status": status}}),
+            json.dumps({
+                "type": "simulation_status_updated",
+                "data": {
+                    "status": status
+                }
+            }),
         )
 
-    async def push_to_queue(self, worker_name: str, entity_id: int):
+    async def push_to_worker_queue(self, worker_name: str, entity_id: int):
         if worker_name not in self.QUEUE_NAMES:
             return
 
@@ -44,30 +49,41 @@ class SimulationStateRepository:
 
         await self.redis.publish(
             f"simulation:{1488}:events",
-            json.dumps({"type": f"pushed_to_{worker_name}_queue", "data": {"queue": state[worker_name]["queue"]}}),
+            json.dumps({
+                "type": "worker_queue_pushed",
+                "data": {
+                    "worker_name": worker_name,
+                    "entity_id": str(entity_id)
+                }
+            }),
         )
 
-    async def pop_from_queue(self, worker_name: str):
-        if worker_name not in self.QUEUE_NAMES:
-            return
-
-        state = await self.get_state()
-
-        if not state[worker_name]["queue"]:
-            return None
-
-        entity_id = state[worker_name]["queue"].pop(0)
-
-        await self._set_state(state)
-
-        await self.redis.publish(
-            f"simulation:{1488}:events",
-            json.dumps({"type": f"popped_from_{worker_name}_queue", "data": {"queue": state[worker_name]["queue"]}}),
-        )
+    # async def pop_from_worker_queue(self, worker_name: str):
+    #     if worker_name not in self.QUEUE_NAMES:
+    #         return
+    #
+    #     state = await self.get_state()
+    #
+    #     if not state[worker_name]["queue"]:
+    #         return None
+    #
+    #     entity_id = state[worker_name]["queue"].pop(0)
+    #
+    #     await self._set_state(state)
+    #
+    #     await self.redis.publish(
+    #         f"simulation:{1488}:events",
+    #         json.dumps({
+    #             "type": "worker_queue_popped",
+    #             "data": {
+    #                 "worker_name": worker_name
+    #             }
+    #         })
+    #     )
 
         return entity_id
 
-    async def set_worker_waiting(self, worker_name: str):
+    async def set_worker_finished_job(self, worker_name: str):
         state = await self.get_state()
 
         state[worker_name]["doing"] = None
@@ -75,11 +91,22 @@ class SimulationStateRepository:
         await self._set_state(state)
 
         await self.redis.publish(
-            f"simulation:{1488}:events", json.dumps({"type": f"{worker_name}_waiting", "data": {}})
+            f"simulation:{1488}:events",
+            json.dumps({
+                "type": "worker_finished_job",
+                "data": {
+                    "worker_name": worker_name
+                }
+            })
         )
 
-    async def set_processing_entity(self, worker_name: str, entity_id: int):
+    async def set_worker_starting_job(self, worker_name: str):
+        if worker_name not in self.QUEUE_NAMES:
+            return
+
         state = await self.get_state()
+
+        entity_id = state[worker_name]["queue"].pop(0)
 
         state[worker_name]["doing"] = str(entity_id)
 
@@ -87,5 +114,10 @@ class SimulationStateRepository:
 
         await self.redis.publish(
             f"simulation:{1488}:events",
-            json.dumps({"type": f"{worker_name}_started_processing", "data": {"entity_id": str(entity_id)}}),
+            json.dumps({
+                "type": "worker_started_job",
+                "data": {
+                    "worker_name": worker_name
+                }
+            }),
         )

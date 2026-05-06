@@ -5,14 +5,30 @@ const sessionStartedKey = `simulation:${simulationId}:started`
 const startButton = document.querySelector(".control-button")
 const stopButton = document.querySelector(".control-button-stop")
 const timerDisplay = document.querySelector(".timer-display")
+const kitchenDoing = document.getElementById("kitchenDoing")
+const kitchenQueue = document.getElementById("kitchenQueue")
 const cashierCurrentClient = document.getElementById("cashierCurrentClient")
 const cashierQueue = document.getElementById("cashierQueue")
+const waiterCurrentClient = document.getElementById("waiterCurrentClient")
+const waiterQueue = document.getElementById("waiterQueue")
+const workerScale = Number.parseFloat(
+  getComputedStyle(document.documentElement).getPropertyValue("--worker-scale")
+) || 1
+const clientCardVisualWidth = 92 * workerScale
 
 let state = {
   status: "paused",
   cashier: {
+    doing: 3,
+    queue: [4, 5, 6, 7, 8, 9]
+  },
+  kitchen: {
     doing: 1,
-    queue: [2, 3, 4, 5, 6, 7]
+    queue: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+  },
+  waiter: {
+    doing: 1,
+    queue: [2]
   }
 }
 
@@ -71,6 +87,23 @@ function handleEvent(msg) {
       handleCashierWaiting()
       break
 
+    case "pushed_to_kitchen_queue":
+      handleKitchenQueuePushed(msg)
+      break
+
+    case "kitchen_queue_updated":
+    case "popped_from_kitchen_queue":
+      handleKitchenQueuePopped(msg)
+      break
+
+    case "kitchen_started_processing":
+      handleKitchenStarted(msg)
+      break
+
+    case "kitchen_waiting":
+      handleKitchenWaiting()
+      break
+
     default:
       console.warn("Unknown event:", msg)
   }
@@ -82,6 +115,14 @@ function handleInit(msg) {
     cashier: {
       doing: msg.data?.cashier?.doing ?? null,
       queue: msg.data?.cashier?.queue ?? []
+    },
+    kitchen: {
+      doing: msg.data?.kitchen?.doing ?? null,
+      queue: msg.data?.kitchen?.queue ?? []
+    },
+    waiter: {
+      doing: msg.data?.waiter?.doing ?? null,
+      queue: msg.data?.waiter?.queue ?? []
     }
   }
 
@@ -110,12 +151,12 @@ function handleStatusChanged(msg) {
 
 function handleCashierQueuePushed(msg) {
   state.cashier.queue = msg.data.queue
-  renderQueue()
+  renderCashier()
 }
 
 function handleCashierQueuePopped(msg) {
   state.cashier.queue = msg.data.queue
-  renderQueue()
+  renderCashier()
 }
 
 function handleCashierStarted(msg) {
@@ -128,10 +169,31 @@ function handleCashierWaiting() {
   renderCashier()
 }
 
+function handleKitchenQueuePushed(msg) {
+  state.kitchen.queue = msg.data.queue
+  renderKitchen()
+}
+
+function handleKitchenQueuePopped(msg) {
+  state.kitchen.queue = msg.data.queue
+  renderKitchen()
+}
+
+function handleKitchenStarted(msg) {
+  state.kitchen.doing = msg.data.entity_id
+  renderKitchen()
+}
+
+function handleKitchenWaiting() {
+  state.kitchen.doing = null
+  renderKitchen()
+}
+
 function renderAll() {
   renderStatus()
+  renderKitchen()
   renderCashier()
-  renderQueue()
+  renderWaiter()
   renderTimer()
 }
 
@@ -149,9 +211,7 @@ function renderCashier() {
   cashierCurrentClient.innerHTML = state.cashier.doing
     ? createClientCard(state.cashier.doing)
     : '<div class="client-card-empty">Нет клиента</div>'
-}
 
-function renderQueue() {
   if (!state.cashier.queue.length) {
     cashierQueue.innerHTML = '<div class="client-card-empty">Очередь пуста</div>'
     return
@@ -162,15 +222,204 @@ function renderQueue() {
     .join("")
 }
 
+function renderKitchen() {
+  kitchenDoing.innerHTML = state.kitchen?.doing
+    ? createTicketCard(state.kitchen.doing)
+    : '<div class="ticket-card-empty">Нет тикета</div>'
+
+  if (!state.kitchen?.queue?.length) {
+    kitchenQueue.innerHTML = '<div class="ticket-card-empty">Очередь тикетов пуста</div>'
+    return
+  }
+
+  kitchenQueue.innerHTML = state.kitchen.queue
+    .map((ticketId) => createTicketCard(ticketId))
+    .join("")
+}
+
+function renderWaiter() {
+  waiterCurrentClient.innerHTML = state.waiter?.doing
+    ? createClientCard(state.waiter.doing)
+    : '<div class="client-card-empty">Нет клиента</div>'
+
+  if (!state.waiter?.queue?.length) {
+    waiterQueue.innerHTML = '<div class="client-card-empty">Очередь пуста</div>'
+    return
+  }
+
+  waiterQueue.innerHTML = state.waiter.queue
+    .map((clientId) => createClientCard(clientId))
+    .join("")
+}
+
 function createClientCard(clientId) {
   return `
     <div class="client-card">
-      <img src="../static/images/захар.svg" alt="Client #${clientId}">
+      <div class="client-card-number">#${clientId}</div>
+      <img src="../static/images/client.svg" alt="Client #${clientId}">
     </div>
   `
 }
-renderCashier()
-renderQueue()
+
+function createTicketCard(ticketId) {
+  return `
+    <div class="ticket-card">
+      <div class="ticket-card-number">#${ticketId}</div>
+      <img src="../static/images/ticket.svg" alt="Ticket #${ticketId}">
+    </div>
+  `
+}
+
+function animateClientArrived() {
+  if (!state.cashier) {
+    state.cashier = { doing: null, queue: [] }
+  }
+
+  if (!Array.isArray(state.cashier.queue)) {
+    state.cashier.queue = []
+  }
+
+  const queueNumbers = state.cashier.queue
+    .map((value) => Number(value))
+    .filter((value) => !Number.isNaN(value))
+
+  const doingNumber = Number(state.cashier.doing)
+  const baseValue = queueNumbers.length
+    ? queueNumbers[queueNumbers.length - 1]
+    : (Number.isNaN(doingNumber) ? 0 : doingNumber)
+
+  const nextClientId = baseValue + 1
+  state.cashier.queue.push(nextClientId)
+
+  const emptyState = cashierQueue.querySelector(".client-card-empty")
+  if (emptyState) {
+    emptyState.remove()
+  }
+
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = createClientCard(nextClientId).trim()
+  const clientCard = wrapper.firstElementChild
+
+  if (!clientCard) {
+    renderCashier()
+    return nextClientId
+  }
+
+  clientCard.classList.add("client-card-arriving")
+  cashierQueue.appendChild(clientCard)
+
+  return nextClientId
+}
+
+function animateClientDoneWithCashier() {
+  const currentClientId = state.cashier?.doing
+
+  if (currentClientId === null || currentClientId === undefined) {
+    return null
+  }
+
+  if (!state.waiter) {
+    state.waiter = { doing: null, queue: [] }
+  }
+
+  if (!Array.isArray(state.waiter.queue)) {
+    state.waiter.queue = []
+  }
+
+  if (!Array.isArray(state.cashier.queue)) {
+    state.cashier.queue = []
+  }
+
+  const startCard = cashierCurrentClient.querySelector(".client-card")
+  const targetContainer = waiterQueue
+
+  state.waiter.queue.push(currentClientId)
+
+  const nextCashierClient = state.cashier.queue.length ? state.cashier.queue.shift() : null
+  state.cashier.doing = nextCashierClient
+
+  if (!startCard || !targetContainer) {
+    renderCashier()
+    renderWaiter()
+    return currentClientId
+  }
+
+  const startRect = startCard.getBoundingClientRect()
+  const targetRect = getWaiterQueueTargetRect()
+
+  const travelCard = startCard.cloneNode(true)
+  travelCard.classList.remove("client-card-arriving")
+  travelCard.classList.add("client-card-travel")
+  travelCard.style.left = `${startRect.left}px`
+  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.width = `${startRect.width}px`
+  document.body.appendChild(travelCard)
+
+  renderCashier()
+
+
+  const deltaX = targetRect.left - startRect.left
+  const deltaY = targetRect.top - startRect.top
+
+  const animation = travelCard.animate(
+    [
+      {
+        transform: "translate(0, 0) scale(1)",
+        opacity: 1
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+        opacity: 1
+      }
+    ],
+    {
+      duration: 3000,
+      easing: "ease-in-out",
+      fill: "forwards"
+    }
+  )
+
+  animation.onfinish = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  animation.oncancel = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  return currentClientId
+}
+
+function getWaiterQueueTargetRect() {
+  const emptyState = waiterQueue.querySelector(".client-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const cards = waiterQueue.querySelectorAll(".client-card")
+  const lastCard = cards[cards.length - 1]
+
+  if (!lastCard) {
+    const rect = waiterQueue.getBoundingClientRect()
+    return {
+      left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
+      top: rect.top
+    }
+  }
+
+  const rect = lastCard.getBoundingClientRect()
+  return {
+    left: rect.left,
+    top: rect.top
+  }
+}
+
 
 function renderTimer() {
   if (!timerDisplay) {
@@ -298,3 +547,18 @@ function markSessionStarted() {
 }
 
 window.debugState = () => console.log(state)
+window.animateClientArrived = animateClientArrived
+window.animateClientDoneWithCashier = animateClientDoneWithCashier
+
+
+renderCashier()
+renderKitchen()
+renderWaiter()
+var millisecondsToWait = 5000;
+setTimeout(function() {
+    animateClientArrived()
+}, 2000);
+
+setTimeout(function() {
+    animateClientDoneWithCashier()
+}, 5000);
