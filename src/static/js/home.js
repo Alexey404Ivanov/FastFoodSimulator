@@ -1,4 +1,4 @@
-﻿﻿const simulationForm = document.getElementById("simulationForm");
+﻿const simulationForm = document.getElementById("simulationForm");
 
 simulationForm.addEventListener("submit", async (event) => {
     event.preventDefault();

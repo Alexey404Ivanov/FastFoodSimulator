@@ -2,7 +2,7 @@ const simulationId = 1488
 const payloadStorageKey = `simulation:${simulationId}:payload`
 const sessionStartedKey = `simulation:${simulationId}:started`
 
-const startButton = document.querySelector(".control-button")
+const continueButton = document.querySelector(".control-button")
 const stopButton = document.querySelector(".control-button-stop")
 const timerDisplay = document.querySelector(".timer-display")
 const kitchenDoing = document.getElementById("kitchenDoing")
@@ -19,16 +19,16 @@ const clientCardVisualWidth = 92 * workerScale
 let state = {
   status: "paused",
   cashier: {
-    doing: 3,
-    queue: [4, 5, 6, 7, 8, 9]
+    doing: null,
+    queue: []
   },
   kitchen: {
-    doing: 1,
-    queue: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    doing: null,
+    queue: []
   },
   waiter: {
-    doing: 1,
-    queue: [2]
+    doing: null,
+    queue: []
   }
 }
 
@@ -57,7 +57,7 @@ ws.onmessage = (event) => {
   handleEvent(msg)
 }
 
-startButton?.addEventListener("click", handleStart)
+continueButton?.addEventListener("click", handleContinue)
 stopButton?.addEventListener("click", handlePause)
 
 function handleEvent(msg) {
@@ -66,65 +66,65 @@ function handleEvent(msg) {
       handleInit(msg)
       break
 
-    case "simulation_status_changed":
-      handleStatusChanged(msg)
-      break
-
-    case "pushed_to_cashier_queue":
-      handleCashierQueuePushed(msg)
-      break
-
-    case "cashier_queue_updated":
-    case "popped_from_cashier_queue":
-      handleCashierQueuePopped(msg)
-      break
-
-    case "cashier_started_processing":
-      handleCashierStarted(msg)
-      break
-
-    case "cashier_waiting":
-      handleCashierWaiting()
-      break
-
-    case "pushed_to_kitchen_queue":
-      handleKitchenQueuePushed(msg)
-      break
-
-    case "kitchen_queue_updated":
-    case "popped_from_kitchen_queue":
-      handleKitchenQueuePopped(msg)
-      break
-
-    case "kitchen_started_processing":
-      handleKitchenStarted(msg)
-      break
-
-    case "kitchen_waiting":
-      handleKitchenWaiting()
-      break
-
-    default:
-      console.warn("Unknown event:", msg)
+    // case "simulation_status_changed":
+    //   handleStatusChanged(msg)
+    //   break
+    //
+    // case "pushed_to_cashier_queue":
+    //   handleCashierQueuePushed(msg)
+    //   break
+    //
+    // case "cashier_queue_updated":
+    // case "popped_from_cashier_queue":
+    //   handleCashierQueuePopped(msg)
+    //   break
+    //
+    // case "cashier_started_processing":
+    //   handleCashierStarted(msg)
+    //   break
+    //
+    // case "cashier_waiting":
+    //   handleCashierWaiting()
+    //   break
+    //
+    // case "pushed_to_kitchen_queue":
+    //   handleKitchenQueuePushed(msg)
+    //   break
+    //
+    // case "kitchen_queue_updated":
+    // case "popped_from_kitchen_queue":
+    //   handleKitchenQueuePopped(msg)
+    //   break
+    //
+    // case "kitchen_started_processing":
+    //   handleKitchenStarted(msg)
+    //   break
+    //
+    // case "kitchen_waiting":
+    //   handleKitchenWaiting()
+    //   break
+    //
+    // default:
+    //   console.warn("Unknown event:", msg)
   }
 }
 
 function handleInit(msg) {
-  state = {
-    status: msg.data?.status ?? "paused",
-    cashier: {
-      doing: msg.data?.cashier?.doing ?? null,
-      queue: msg.data?.cashier?.queue ?? []
-    },
-    kitchen: {
-      doing: msg.data?.kitchen?.doing ?? null,
-      queue: msg.data?.kitchen?.queue ?? []
-    },
-    waiter: {
-      doing: msg.data?.waiter?.doing ?? null,
-      queue: msg.data?.waiter?.queue ?? []
-    }
-  }
+  // state = {
+  //   status: msg.data?.status ?? "paused",
+  //   cashier: {
+  //     doing: msg.data?.cashier?.doing ?? null,
+  //     queue: msg.data?.cashier?.queue ?? []
+  //   },
+  //   kitchen: {
+  //     doing: msg.data?.kitchen?.doing ?? null,
+  //     queue: msg.data?.kitchen?.queue ?? []
+  //   },
+  //   waiter: {
+  //     doing: msg.data?.waiter?.doing ?? null,
+  //     queue: msg.data?.waiter?.queue ?? []
+  //   }
+  // }
 
   if (msg.server_now) {
     timeOffset = Date.now() - msg.server_now
@@ -198,8 +198,8 @@ function renderAll() {
 }
 
 function renderStatus() {
-  if (startButton) {
-    startButton.disabled = state.status === "running"
+  if (continueButton) {
+    continueButton.disabled = state.status === "running"
   }
 
   if (stopButton) {
@@ -475,7 +475,7 @@ function stopTimer() {
   }
 }
 
-async function handleStart() {
+async function handleContinue() {
   const payload = loadStoredPayload()
   const endpoint = hasStartedInSession() ? "/api/simulation/continue" : "/api/simulation/start"
   const options = {

@@ -12,21 +12,38 @@ class SimulationStateRepository:
         self.redis = RedisProvider.get_client()
 
     async def get_state(self):
-        data = await self.redis.get(f"simulation:{1488}:state")
-        return json.loads(data)
+        """Собираем полное состояние за один RTT через pipeline"""
+        base_key = f"simulation:{1488}"
 
-    async def _set_state(self, state: dict):
-        await self.redis.set(f"simulation:{1488}:state", json.dumps(state))
+        # Запускаем все запросы параллельно
+        status_task = self.redis.hget(base_key, "status")
+
+        workers_tasks = {}
+        for worker in ["cashier", "kitchen", "waiter"]:
+            doing_task = self.redis.hget(f"{base_key}:{worker}", "doing")
+            queue_task = self.redis.lrange(f"{base_key}:{worker}:queue", 0, -1)
+            workers_tasks[worker] = (doing_task, queue_task)
+
+        # Ждём все результаты
+        status = await status_task
+
+        state = {"status": status or "paused"}
+
+        for worker, (doing_task, queue_task) in workers_tasks.items():
+            doing = await doing_task
+            queue = await queue_task
+            state[worker] = {"doing": doing or None, "queue": queue}
+
+        return state
+
+    # async def _set_state(self, state: dict):
+    #     await self.redis.set(f"simulation:{1488}:state", json.dumps(state))
 
     async def set_status(self, status: str):
         if status not in self.STATUSES:
             return
 
-        state = await self.get_state()
-        state["status"] = status
-
-        await self._set_state(state)
-
+        await self.redis.hset(f"simulation:{1488}", "status", status)
         await self.redis.publish(
             f"simulation:{1488}:events",
             json.dumps({
@@ -41,11 +58,7 @@ class SimulationStateRepository:
         if worker_name not in self.QUEUE_NAMES:
             return
 
-        state = await self.get_state()
-
-        state[worker_name]["queue"].append(str(entity_id))
-
-        await self._set_state(state)
+        await self.redis.rpush(f"simulation:{1488}:{worker_name}:queue", entity_id)
 
         await self.redis.publish(
             f"simulation:{1488}:events",
@@ -84,11 +97,10 @@ class SimulationStateRepository:
         # return entity_id
 
     async def set_worker_finished_job(self, worker_name: str):
-        state = await self.get_state()
+        if worker_name not in self.QUEUE_NAMES:
+            return
 
-        state[worker_name]["doing"] = None
-
-        await self._set_state(state)
+        await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", "")
 
         await self.redis.publish(
             f"simulation:{1488}:events",
@@ -104,13 +116,8 @@ class SimulationStateRepository:
         if worker_name not in self.QUEUE_NAMES:
             return
 
-        state = await self.get_state()
-
-        entity_id = state[worker_name]["queue"].pop(0)
-
-        state[worker_name]["doing"] = str(entity_id)
-
-        await self._set_state(state)
+        popped_from_queue = await self.redis.lpop(f"simulation:{1488}:{worker_name}:queue")
+        await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", popped_from_queue)
 
         await self.redis.publish(
             f"simulation:{1488}:events",

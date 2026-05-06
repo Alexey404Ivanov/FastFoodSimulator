@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from src.api.dependencies import publisher
 from src.contracts.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent
 from src.infrastructure.redis.provider import RedisProvider
-
+from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 templates = Jinja2Templates(directory="src/templates")
 
 router = APIRouter()
@@ -21,6 +21,10 @@ async def home(request: Request):
 async def get_page(request: Request):
     return templates.TemplateResponse(request=request, name="simulation_1488.html")
 
+@router.get("/simulation/state")
+async def get_state(request: Request):
+    repo = SimulationStateRepository()
+    return await repo.get_state()
 
 @router.post("/api/simulation/start")
 async def start_simulation(body: SimulationStartedEvent):
