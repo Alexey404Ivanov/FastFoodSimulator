@@ -1,4 +1,5 @@
-﻿from contextlib import asynccontextmanager
+﻿from asyncio import shield
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -15,11 +16,16 @@ async def lifespan(app: FastAPI):
     await RedisProvider.init("redis://localhost:6379/0")
     await SimulationStateLifecycle.initialize(simulation_id=1488)
 
-    yield
+    try:
+        yield
+    finally:
+        try:
+            await shield(SimulationStateLifecycle.cleanup(simulation_id=1488))
+        except Exception as e:
+            print(f"Cleanup error: {e}")
 
-    await publisher.close()
-    await SimulationStateLifecycle.cleanup(simulation_id=1488)
-    await RedisProvider.close()
+        await publisher.close()
+        await RedisProvider.close()
 
 app = FastAPI(lifespan=lifespan)
 

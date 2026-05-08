@@ -36,9 +36,6 @@ class SimulationStateRepository:
 
         return state
 
-    # async def _set_state(self, state: dict):
-    #     await self.redis.set(f"simulation:{1488}:state", json.dumps(state))
-
     async def set_status(self, status: str):
         if status not in self.STATUSES:
             return
@@ -70,31 +67,6 @@ class SimulationStateRepository:
                 }
             }),
         )
-
-    # async def pop_from_worker_queue(self, worker_name: str):
-    #     if worker_name not in self.QUEUE_NAMES:
-    #         return
-    #
-    #     state = await self.get_state()
-    #
-    #     if not state[worker_name]["queue"]:
-    #         return None
-    #
-    #     entity_id = state[worker_name]["queue"].pop(0)
-    #
-    #     await self._set_state(state)
-    #
-    #     await self.redis.publish(
-    #         f"simulation:{1488}:events",
-    #         json.dumps({
-    #             "type": "worker_queue_popped",
-    #             "data": {
-    #                 "worker_name": worker_name
-    #             }
-    #         })
-    #     )
-
-        # return entity_id
 
     async def set_worker_finished_job(self, worker_name: str):
         if worker_name not in self.QUEUE_NAMES:

@@ -46,20 +46,17 @@ async def pause_simulation():
 @router.websocket("/api/simulation/1488/events")
 async def simulation_ws(websocket: WebSocket, simulation_id: int=1488):
     await websocket.accept()
-
     redis = await RedisProvider.get_client()
 
-    state_key = f"simulation:{simulation_id}:state"
+    repo = SimulationStateRepository()
+    state = await repo.get_state()
+
     channel = f"simulation:{simulation_id}:events"
-
-    state_data = await redis.get(state_key)
-
-    state = json.loads(state_data) if state_data else {}
 
     await websocket.send_json({
         "type": "init",
         "data": state,
-        "server_now": int(time.time() * 1000),  # для таймера
+        "simulation_time": int(time.time() * 1000),  # для таймера
     })
 
     pubsub = redis.pubsub()
@@ -67,7 +64,10 @@ async def simulation_ws(websocket: WebSocket, simulation_id: int=1488):
 
     try:
         async for message in pubsub.listen():
-            await websocket.send_json(message)
+            if message["type"] == "message":
+                payload = json.loads(message["data"])
+
+                await websocket.send_json(payload)
 
     except asyncio.CancelledError:
         print("WS task cancelled")
