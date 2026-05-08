@@ -7,6 +7,7 @@ const stopButton = document.getElementById("pauseButton")
 const timerDisplay = document.querySelector(".timer-display")
 const kitchenDoing = document.getElementById("kitchenDoing")
 const kitchenQueue = document.getElementById("kitchenQueue")
+const cashierWorkerImage = document.querySelector(".worker-node-cashier > img")
 const cashierCurrentClient = document.getElementById("cashierCurrentClient")
 const cashierQueue = document.getElementById("cashierQueue")
 const waiterCurrentClient = document.getElementById("waiterCurrentClient")
@@ -15,6 +16,7 @@ const workerScale = Number.parseFloat(
   getComputedStyle(document.documentElement).getPropertyValue("--worker-scale")
 ) || 1
 const clientCardVisualWidth = 92 * workerScale
+const ticketCardVisualWidth = 92 * workerScale
 
 let state = {
   status: "paused",
@@ -103,13 +105,16 @@ function handleCashierQueuePushed(entity_id) {
 }
 
 function handleKitchenQueuePushed(entity_id) {
+  if (!Array.isArray(state.kitchen.queue)) {
+    state.kitchen.queue = []
+  }
+
   state.kitchen.queue.push(entity_id)
-  renderKitchen()
+  animateCreatedNewOrder(entity_id)
 }
 
 function handleWaiterQueuePushed(entity_id) {
   state.waiter.queue.push(entity_id)
-  // animateClientDoneWithCashier(entity_id)
 }
 
 
@@ -139,7 +144,13 @@ function handleCashierStartedJob() {
 }
 
 function handleKitchenStartedJob() {
+  if (!Array.isArray(state.kitchen.queue) || !state.kitchen.queue.length) {
+    return
+  }
 
+  const nextTicketId = state.kitchen.queue.shift()
+  state.kitchen.doing = nextTicketId
+  animateKitchenStartedJob(nextTicketId)
 }
 
 function handleWaiterStartedJob() {
@@ -177,7 +188,14 @@ function handleCashierFinishedJob() {
 }
 
 function handleKitchenFinishedJob() {
+  const finishedTicketId = state.kitchen?.doing
 
+  if (finishedTicketId === null || finishedTicketId === undefined) {
+    return
+  }
+
+  state.kitchen.doing = null
+  renderKitchen()
 }
 
 function handleWaiterFinishedJob() {
@@ -235,10 +253,10 @@ function renderStatus() {
 function renderCashier() {
   cashierCurrentClient.innerHTML = state.cashier.doing
     ? createClientCard(state.cashier.doing)
-    : '<div class="client-card-empty">Нет клиента</div>'
+    : '<div class="client-card-empty">Нет текущего клиента</div>'
 
   if (!state.cashier.queue.length) {
-    cashierQueue.innerHTML = '<div class="client-card-empty">Очередь пуста</div>'
+    cashierQueue.innerHTML = '<div class="client-card-empty">Очередь клиентов пуста</div>'
     return
   }
 
@@ -250,10 +268,10 @@ function renderCashier() {
 function renderKitchen() {
   kitchenDoing.innerHTML = state.kitchen?.doing
     ? createTicketCard(state.kitchen.doing)
-    : '<div class="ticket-card-empty">Нет тикета</div>'
+    : '<div class="ticket-card-empty">Нет текущего заказа</div>'
 
   if (!state.kitchen?.queue?.length) {
-    kitchenQueue.innerHTML = '<div class="ticket-card-empty">Очередь тикетов пуста</div>'
+    kitchenQueue.innerHTML = '<div class="ticket-card-empty">Очередь заказов пуста</div>'
     return
   }
 
@@ -265,10 +283,10 @@ function renderKitchen() {
 function renderWaiter() {
   waiterCurrentClient.innerHTML = state.waiter?.doing
     ? createClientCard(state.waiter.doing)
-    : '<div class="client-card-empty">Нет клиента</div>'
+    : '<div class="client-card-empty">Нет текущего клиента</div>'
 
   if (!state.waiter?.queue?.length) {
-    waiterQueue.innerHTML = '<div class="client-card-empty">Очередь пуста</div>'
+    waiterQueue.innerHTML = '<div class="client-card-empty">Очередь клиентов на выдачу пуста</div>'
     return
   }
 
@@ -326,6 +344,70 @@ function animateClientArrived(entity_id) {
   return nextClientId
 }
 
+function animateCreatedNewOrder(entity_id) {
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = createTicketCard(entity_id).trim()
+  const travelCard = wrapper.firstElementChild
+
+  if (!travelCard || !cashierWorkerImage) {
+    renderKitchen()
+    return entity_id
+  }
+
+  const startRect = cashierWorkerImage.getBoundingClientRect()
+  const targetRect = getKitchenQueueTargetRect()
+  const queueBeforeNewTicket = state.kitchen.queue.slice(0, -1)
+  const startLeft = startRect.left + (startRect.width - ticketCardVisualWidth) / 2
+  const startTop = startRect.top - 28 * workerScale
+
+  travelCard.style.position = "fixed"
+  travelCard.style.zIndex = "20"
+  travelCard.style.pointerEvents = "none"
+  travelCard.style.margin = "0"
+  travelCard.style.left = `${startLeft}px`
+  travelCard.style.top = `${startTop}px`
+  travelCard.style.width = `${ticketCardVisualWidth}px`
+
+  kitchenQueue.innerHTML = queueBeforeNewTicket.length
+    ? queueBeforeNewTicket.map((ticketId) => createTicketCard(ticketId)).join("")
+    : '<div class="ticket-card-empty">Очередь заказов пуста</div>'
+
+  document.body.appendChild(travelCard)
+
+  const deltaX = targetRect.left - startLeft
+  const deltaY = targetRect.top - startTop
+
+  const animation = travelCard.animate(
+    [
+      {
+        transform: "translate(0, 0) scale(1)",
+        opacity: 1
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+        opacity: 1
+      }
+    ],
+    {
+      duration: 3000,
+      easing: "ease-in-out",
+      fill: "forwards"
+    }
+  )
+
+  animation.onfinish = () => {
+    travelCard.remove()
+    renderKitchen()
+  }
+
+  animation.oncancel = () => {
+    travelCard.remove()
+    renderKitchen()
+  }
+
+  return entity_id
+}
+
 function animateClientDoneWithCashier(entity_id) {
   const currentClientId = entity_id
 
@@ -367,9 +449,8 @@ function animateClientDoneWithCashier(entity_id) {
   travelCard.style.left = `${startRect.left}px`
   travelCard.style.top = `${startRect.top}px`
   travelCard.style.width = `${startRect.width}px`
-  document.body.appendChild(travelCard)
-
   renderCashier()
+  document.body.appendChild(travelCard)
 
 
   const deltaX = targetRect.left - startRect.left
@@ -424,9 +505,11 @@ function animateCashierStartedJob(entity_id) {
   travelCard.style.left = `${startRect.left}px`
   travelCard.style.top = `${startRect.top}px`
   travelCard.style.width = `${startRect.width}px`
+  cashierCurrentClient.innerHTML = '<div class="client-card-empty">Нет клиента</div>'
+  cashierQueue.innerHTML = state.cashier.queue.length
+    ? state.cashier.queue.map((clientId) => createClientCard(clientId)).join("")
+    : '<div class="client-card-empty">Очередь пуста</div>'
   document.body.appendChild(travelCard)
-
-  renderCashier()
 
   const deltaX = targetRect.left - startRect.left
   const deltaY = targetRect.top - startRect.top
@@ -462,6 +545,68 @@ function animateCashierStartedJob(entity_id) {
   return entity_id
 }
 
+function animateKitchenStartedJob(entity_id) {
+  const queueCards = kitchenQueue.querySelectorAll(".ticket-card")
+  const startCard = queueCards[0]
+
+  if (!startCard) {
+    renderKitchen()
+    return entity_id
+  }
+
+  const startRect = startCard.getBoundingClientRect()
+  const targetRect = getKitchenDoingTargetRect()
+
+  const travelCard = startCard.cloneNode(true)
+  travelCard.style.position = "fixed"
+  travelCard.style.zIndex = "20"
+  travelCard.style.pointerEvents = "none"
+  travelCard.style.margin = "0"
+  travelCard.style.left = `${startRect.left}px`
+  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.width = `${startRect.width}px`
+
+  kitchenDoing.innerHTML = '<div class="ticket-card-empty">Нет текущего заказа</div>'
+  kitchenQueue.innerHTML = state.kitchen.queue.length
+    ? state.kitchen.queue.map((ticketId) => createTicketCard(ticketId)).join("")
+    : '<div class="ticket-card-empty">Очередь заказов пуста</div>'
+
+  document.body.appendChild(travelCard)
+
+  const deltaX = targetRect.left - startRect.left
+  const deltaY = targetRect.top - startRect.top
+
+  const animation = travelCard.animate(
+    [
+      {
+        transform: "translate(0, 0) scale(1)",
+        opacity: 1
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+        opacity: 1
+      }
+    ],
+    {
+      duration: 3000,
+      easing: "ease-in-out",
+      fill: "forwards"
+    }
+  )
+
+  animation.onfinish = () => {
+    travelCard.remove()
+    renderKitchen()
+  }
+
+  animation.oncancel = () => {
+    travelCard.remove()
+    renderKitchen()
+  }
+
+  return entity_id
+}
+
 function getCashierCurrentClientTargetRect() {
   const existingCard = cashierCurrentClient.querySelector(".client-card")
   if (existingCard) {
@@ -484,6 +629,51 @@ function getCashierCurrentClientTargetRect() {
   const rect = cashierCurrentClient.getBoundingClientRect()
   return {
     left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
+    top: rect.top
+  }
+}
+
+function getKitchenQueueTargetRect() {
+  const cards = kitchenQueue.querySelectorAll(".ticket-card")
+  const lastCard = cards[cards.length - 1]
+
+  if (lastCard) {
+    const rect = lastCard.getBoundingClientRect()
+    return {
+      left: rect.left,
+      top: rect.top
+    }
+  }
+
+  const emptyState = kitchenQueue.querySelector(".ticket-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - ticketCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const rect = kitchenQueue.getBoundingClientRect()
+  return {
+    left: rect.left + Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2),
+    top: rect.top
+  }
+}
+
+function getKitchenDoingTargetRect() {
+  const emptyState = kitchenDoing.querySelector(".ticket-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - ticketCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const rect = kitchenDoing.getBoundingClientRect()
+  return {
+    left: rect.left + Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2),
     top: rect.top
   }
 }
