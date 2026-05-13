@@ -20,18 +20,6 @@
 
     <main class="page-content">
         <section class="worker-tree" aria-label="Схема воркеров">
-            <div class="worker-node worker-node-root">
-                <div class="kitchen-state">
-                    <div class="ticket-line ticket-line-queue" id="kitchenQueue"></div>
-                    <div class="ticket-line ticket-line-doing" id="kitchenDoing"></div>
-                </div>
-                <img src="../static/images/workers/kitchen.svg" alt="Kitchen worker">
-                <div class="waiter-table-node">
-                    <div class="burger-queue" id="waiterBurgerQueue"></div>
-                    <img src="../static/images/waiter_table.svg" alt="Waiter table">
-                </div>
-            </div>
-
             <div class="worker-children">
                 <div class="worker-node worker-node-cashier">
                     <img src="../static/images/workers/cashier.svg" alt="Cashier worker">
@@ -43,6 +31,18 @@
                         <div class="worker-queue">
                             <div class="client-queue" id="cashierQueue"></div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="worker-node worker-node-root">
+                    <div class="kitchen-state">
+                        <div class="ticket-line ticket-line-queue" id="kitchenQueue"></div>
+                        <div class="ticket-line ticket-line-doing" id="kitchenDoing"></div>
+                    </div>
+                    <img src="../static/images/workers/kitchen.svg" alt="Kitchen worker">
+                    <div class="waiter-table-node">
+                        <div class="burger-queue" id="waiterBurgerQueue"></div>
+                        <img src="../static/images/waiter_table.svg" alt="Waiter table">
                     </div>
                 </div>
 

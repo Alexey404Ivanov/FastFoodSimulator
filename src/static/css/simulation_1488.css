@@ -147,17 +147,16 @@ body {
 }
 
 .worker-tree {
-    width: min(100%, 1800px);
-    display: grid;
-    justify-items: center;
-    gap: calc(92px * var(--worker-scale));
+    width: min(100%, 1860px);
+    display: flex;
+    justify-content: center;
 }
 
 .worker-children {
-    width: min(100%, 1480px);
+    width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, minmax(360px, 1fr));
-    gap: calc(200px * var(--worker-scale));
+    grid-template-columns: repeat(3, minmax(320px, 1fr));
+    gap: calc(120px * var(--worker-scale));
     align-items: start;
 }
 
@@ -169,6 +168,9 @@ body {
 
 .worker-node-root {
     gap: calc(28px * var(--worker-scale));
+    position: relative;
+    align-content: start;
+    padding-bottom: calc(220px * var(--worker-scale));
 }
 
 .waiter-table-node {
@@ -176,6 +178,11 @@ body {
     display: grid;
     justify-items: center;
     gap: calc(10px * var(--worker-scale));
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translate(-50%, calc(-6px * var(--worker-scale)));
+    z-index: 0;
 }
 
 .worker-node img {
@@ -435,13 +442,8 @@ body {
 }
 
 @media (max-width: 1200px) {
-    .worker-tree {
-        gap: calc(72px * var(--worker-scale));
-    }
-
     .worker-children {
-        width: min(100%, 1080px);
-        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        grid-template-columns: repeat(3, minmax(240px, 1fr));
         gap: calc(96px * var(--worker-scale));
     }
 
@@ -473,10 +475,6 @@ body {
 
     .page-content {
         padding-top: 170px;
-    }
-
-    .worker-tree {
-        gap: calc(48px * var(--worker-scale));
     }
 
     .worker-children {
@@ -518,7 +516,7 @@ body {
     }
 
     .worker-tree {
-        gap: calc(40px * var(--worker-scale));
+        width: 100%;
     }
 
     .ticket-line {

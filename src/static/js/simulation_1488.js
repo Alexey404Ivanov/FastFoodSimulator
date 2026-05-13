@@ -328,8 +328,10 @@ function renderKitchen() {
 }
 
 function renderWaiter() {
-  waiterCurrentClient.innerHTML = state.waiter?.doing
-    ? createClientCard(state.waiter.doing)
+  const currentWaiterClientId = getWaiterVisibleClientId()
+
+  waiterCurrentClient.innerHTML = currentWaiterClientId
+    ? createClientCard(currentWaiterClientId)
     : '<div class="client-card-empty">Нет текущего клиента</div>'
 
   if (!state.waiter?.queue?.length) {
@@ -344,12 +346,15 @@ function renderWaiter() {
 }
 
 function renderWaiterClientQueue() {
-  if (!waiterClientQueueState.length) {
+  const currentWaiterClientId = getWaiterVisibleClientId()
+  const visibleQueue = getWaiterQueuedClients(currentWaiterClientId)
+
+  if (!visibleQueue.length) {
     waiterClientQueue.innerHTML = '<div class="client-card-empty">Очередь клиентов пуста</div>'
     return
   }
 
-  waiterClientQueue.innerHTML = waiterClientQueueState
+  waiterClientQueue.innerHTML = visibleQueue
     .map((clientId) => createClientCard(clientId))
     .join("")
 }
@@ -747,9 +752,8 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
     return entity_id
   }
 
-  waiterCurrentClient.innerHTML = '<div class="client-card-empty">Нет текущего клиента</div>'
   const routeStartRect = getWaiterDeliveryStartRect()
-  const targetRect = getWaiterCurrentClientTargetRect()
+  const targetRect = getWaiterStandTargetRect()
   const fullDeltaX = targetRect.left - routeStartRect.left
   const fullDeltaY = targetRect.top - routeStartRect.top
   const progressRatio = waiterIntervalMs > 0 ? clampedProgress / waiterIntervalMs : 1
@@ -904,6 +908,14 @@ function getWaiterCurrentClientTargetRect() {
   }
 }
 
+function getWaiterStandTargetRect() {
+  const rect = waiterCurrentClient.getBoundingClientRect()
+  return {
+    left: rect.left + Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2),
+    top: rect.top - 72 * workerScale
+  }
+}
+
 function getWaiterDeliveryStartRect() {
   if (waiterTableImage) {
     const rect = waiterTableImage.getBoundingClientRect()
@@ -995,6 +1007,29 @@ function removeWaiterClientFromQueue(entity_id) {
   if (waiterClientQueueState.length) {
     waiterClientQueueState.shift()
   }
+}
+
+function getWaiterVisibleClientId() {
+  if (state.waiter?.doing !== null && state.waiter?.doing !== undefined) {
+    return state.waiter.doing
+  }
+
+  return waiterClientQueueState[0] ?? null
+}
+
+function getWaiterQueuedClients(currentClientId) {
+  if (currentClientId === null || currentClientId === undefined) {
+    return waiterClientQueueState.slice()
+  }
+
+  const visibleQueue = waiterClientQueueState.slice()
+  const currentClientIndex = visibleQueue.indexOf(currentClientId)
+
+  if (currentClientIndex !== -1) {
+    visibleQueue.splice(currentClientIndex, 1)
+  }
+
+  return visibleQueue
 }
 
 function getWaiterIntervalMs() {
