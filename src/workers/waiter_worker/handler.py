@@ -34,7 +34,10 @@ class WaiterHandler:
                     message.body.decode()
                 )
                 await self.redis_repo.set_status("running")
+
                 self.waiter_interval_seconds = event.waiter_interval_seconds
+                await self.redis_repo.set_waiter_interval(self.waiter_interval_seconds)
+
                 self.remaining_time = self.waiter_interval_seconds
 
             elif routing_key == "simulation.paused":

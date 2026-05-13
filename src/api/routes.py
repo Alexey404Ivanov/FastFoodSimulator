@@ -56,7 +56,6 @@ async def simulation_ws(websocket: WebSocket, simulation_id: int=1488):
     await websocket.send_json({
         "type": "init",
         "data": state,
-        "simulation_time": int(time.time() * 1000),  # для таймера
     })
 
     pubsub = redis.pubsub()

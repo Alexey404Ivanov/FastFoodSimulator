@@ -171,6 +171,13 @@ body {
     gap: calc(28px * var(--worker-scale));
 }
 
+.waiter-table-node {
+    width: min(100%, calc(640px * var(--worker-scale)));
+    display: grid;
+    justify-items: center;
+    gap: calc(10px * var(--worker-scale));
+}
+
 .worker-node img {
     width: clamp(calc(320px * var(--worker-scale)), calc(34vw * var(--worker-scale)), calc(480px * var(--worker-scale)));
     height: auto;
@@ -183,6 +190,10 @@ body {
 .worker-node-cashier,
 .worker-node-waiter {
     align-content: start;
+}
+
+.waiter-table-node > img {
+    width: clamp(calc(240px * var(--worker-scale)), calc(24vw * var(--worker-scale)), calc(320px * var(--worker-scale)));
 }
 
 .kitchen-state {
@@ -274,7 +285,24 @@ body {
     padding: calc(14px * var(--worker-scale)) 0 calc(4px * var(--worker-scale));
 }
 
+.burger-queue {
+    width: 100%;
+    min-height: calc(120px * var(--worker-scale));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    gap: calc(18px * var(--worker-scale));
+    padding: 0 0 calc(4px * var(--worker-scale));
+}
+
 .client-card {
+    display: grid;
+    justify-items: center;
+    gap: calc(8px * var(--worker-scale));
+}
+
+.burger-card {
     display: grid;
     justify-items: center;
     gap: calc(8px * var(--worker-scale));
@@ -301,7 +329,23 @@ body {
     line-height: 1;
 }
 
+.burger-card-number {
+    color: #ffffff;
+    font-size: calc(22px * var(--worker-scale));
+    font-weight: 700;
+    line-height: 1;
+}
+
 .client-card img {
+    width: calc(92px * var(--worker-scale));
+    height: auto;
+    display: block;
+    filter:
+        drop-shadow(0 12px 22px rgba(98, 51, 135, 0.22))
+        drop-shadow(0 2px 0 rgba(255, 255, 255, 0.16));
+}
+
+.burger-card img {
     width: calc(92px * var(--worker-scale));
     height: auto;
     display: block;
@@ -317,6 +361,20 @@ body {
 }
 
 .client-card-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(96px * var(--worker-scale));
+    padding: 0 calc(24px * var(--worker-scale));
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: calc(20px * var(--worker-scale));
+    text-align: center;
+    background: rgba(255, 244, 250, 0.06);
+}
+
+.burger-card-empty {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -451,7 +509,15 @@ body {
         width: calc(72px * var(--worker-scale));
     }
 
+    .burger-card img {
+        width: calc(72px * var(--worker-scale));
+    }
+
     .client-card-number {
+        font-size: calc(18px * var(--worker-scale));
+    }
+
+    .burger-card-number {
         font-size: calc(18px * var(--worker-scale));
     }
 
@@ -460,6 +526,10 @@ body {
     }
 
     .client-card-empty {
+        font-size: calc(17px * var(--worker-scale));
+    }
+
+    .burger-card-empty {
         font-size: calc(17px * var(--worker-scale));
     }
 }

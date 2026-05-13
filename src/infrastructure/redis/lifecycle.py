@@ -21,7 +21,8 @@ class SimulationStateLifecycle:
 
         # Официант
         pipe.hset(f"{base_key}:waiter", "doing", "")
-
+        pipe.set(f"{base_key}:waiter_started_work_at", "")
+        pipe.set(f"{base_key}:waiter_interval", "")
         # Выполняем все к
         await pipe.execute()
 
@@ -39,6 +40,8 @@ class SimulationStateLifecycle:
             f"{base_key}:kitchen:queue",
             f"{base_key}:waiter",
             f"{base_key}:waiter:queue",
+            f"{base_key}:waiter_started_work_at",
+            f"{base_key}:waiter_interval",
         ]
         for key in keys_to_delete:
             pipe.delete(key)

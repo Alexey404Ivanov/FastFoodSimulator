@@ -7,6 +7,7 @@ const stopButton = document.getElementById("pauseButton")
 const timerDisplay = document.querySelector(".timer-display")
 const kitchenDoing = document.getElementById("kitchenDoing")
 const kitchenQueue = document.getElementById("kitchenQueue")
+const kitchenWorkerImage = document.querySelector(".worker-node-root > img")
 const cashierWorkerImage = document.querySelector(".worker-node-cashier > img")
 const cashierCurrentClient = document.getElementById("cashierCurrentClient")
 const cashierQueue = document.getElementById("cashierQueue")
@@ -17,6 +18,7 @@ const workerScale = Number.parseFloat(
 ) || 1
 const clientCardVisualWidth = 92 * workerScale
 const ticketCardVisualWidth = 92 * workerScale
+const burgerCardVisualWidth = 92 * workerScale
 
 let state = {
   status: "paused",
@@ -31,7 +33,9 @@ let state = {
   waiter: {
     doing: null,
     queue: []
-  }
+  },
+  waiter_started_work_time: null,
+  waiter_interval: null
 }
 
 const protocol = window.location.protocol === "https:" ? "wss" : "ws"
@@ -115,6 +119,7 @@ function handleKitchenQueuePushed(entity_id) {
 
 function handleWaiterQueuePushed(entity_id) {
   state.waiter.queue.push(entity_id)
+  animateOrderDone(entity_id)
 }
 
 
@@ -154,7 +159,9 @@ function handleKitchenStartedJob() {
 }
 
 function handleWaiterStartedJob() {
-
+  const nextOrderId = state.waiter.queue.shift()
+  state.waiter.doing = nextOrderId
+  animateWaiterGoToClient(nextOrderId)
 }
 
 function handleWorkerFinishedJob(data) {
@@ -199,7 +206,14 @@ function handleKitchenFinishedJob() {
 }
 
 function handleWaiterFinishedJob() {
+  const finishedOrderId = state.waiter?.doing
 
+  if (finishedOrderId === null || finishedOrderId === undefined) {
+    return
+  }
+
+  state.waiter.doing = null
+  renderWaiter()
 }
 
 function handleInit(msg) {
@@ -216,7 +230,9 @@ function handleInit(msg) {
     waiter: {
       doing: msg.data?.waiter?.doing ?? null,
       queue: msg.data?.waiter?.queue ?? []
-    }
+    },
+    waiter_started_work_time: msg.data?.waiter_started_work_time ?? null,
+    waiter_interval: msg.data?.waiter_interval ?? null
   }
   console.log(state)
 
@@ -282,16 +298,16 @@ function renderKitchen() {
 
 function renderWaiter() {
   waiterCurrentClient.innerHTML = state.waiter?.doing
-    ? createClientCard(state.waiter.doing)
-    : '<div class="client-card-empty">Нет текущего клиента</div>'
+    ? createBurgerCard(state.waiter.doing)
+    : '<div class="burger-card-empty">Нет текущего заказа</div>'
 
   if (!state.waiter?.queue?.length) {
-    waiterQueue.innerHTML = '<div class="client-card-empty">Очередь клиентов на выдачу пуста</div>'
+    waiterQueue.innerHTML = '<div class="burger-card-empty">Очередь выдачи пуста</div>'
     return
   }
 
   waiterQueue.innerHTML = state.waiter.queue
-    .map((clientId) => createClientCard(clientId))
+    .map((orderId) => createBurgerCard(orderId))
     .join("")
 }
 
@@ -309,6 +325,15 @@ function createTicketCard(ticketId) {
     <div class="ticket-card">
       <div class="ticket-card-number">#${ticketId}</div>
       <img src="../static/images/ticket.svg" alt="Ticket #${ticketId}">
+    </div>
+  `
+}
+
+function createBurgerCard(orderId) {
+  return `
+    <div class="burger-card">
+      <div class="burger-card-number">#${orderId}</div>
+      <img src="../static/images/burger.svg" alt="Burger #${orderId}">
     </div>
   `
 }
@@ -415,33 +440,18 @@ function animateClientDoneWithCashier(entity_id) {
     return null
   }
 
-  if (!state.waiter) {
-    state.waiter = { doing: null, queue: [] }
-  }
-
-  if (!Array.isArray(state.waiter.queue)) {
-    state.waiter.queue = []
-  }
-
-  if (!Array.isArray(state.cashier.queue)) {
-    state.cashier.queue = []
-  }
-
   const startCard = cashierCurrentClient.querySelector(".client-card")
-  const targetContainer = waiterQueue
 
-  if (!state.waiter.queue.includes(entity_id)) {
-    state.waiter.queue.push(entity_id)
-  }
-
-  if (!startCard || !targetContainer) {
+  if (!startCard) {
     renderCashier()
-    renderWaiter()
     return currentClientId
   }
 
   const startRect = startCard.getBoundingClientRect()
-  const targetRect = getWaiterQueueTargetRect()
+  const targetRect = {
+    left: startRect.left + clientCardVisualWidth * 0.4,
+    top: startRect.top + 140 * workerScale
+  }
 
   const travelCard = startCard.cloneNode(true)
   travelCard.classList.remove("client-card-arriving")
@@ -476,12 +486,10 @@ function animateClientDoneWithCashier(entity_id) {
 
   animation.onfinish = () => {
     travelCard.remove()
-    renderWaiter()
   }
 
   animation.oncancel = () => {
     travelCard.remove()
-    renderWaiter()
   }
 
   return currentClientId
@@ -607,6 +615,132 @@ function animateKitchenStartedJob(entity_id) {
   return entity_id
 }
 
+function animateOrderDone(entity_id) {
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = createBurgerCard(entity_id).trim()
+  const travelCard = wrapper.firstElementChild
+
+  if (!travelCard || !kitchenWorkerImage) {
+    renderWaiter()
+    return entity_id
+  }
+
+  const startRect = kitchenWorkerImage.getBoundingClientRect()
+  const targetRect = getWaiterQueueTargetRect()
+  const queueBeforeNewBurger = state.waiter.queue.slice(0, -1)
+  const startLeft = startRect.left + (startRect.width - burgerCardVisualWidth) / 2
+  const startTop = startRect.top + startRect.height - 16 * workerScale
+
+  travelCard.style.position = "fixed"
+  travelCard.style.zIndex = "20"
+  travelCard.style.pointerEvents = "none"
+  travelCard.style.margin = "0"
+  travelCard.style.left = `${startLeft}px`
+  travelCard.style.top = `${startTop}px`
+  travelCard.style.width = `${burgerCardVisualWidth}px`
+
+  waiterQueue.innerHTML = queueBeforeNewBurger.length
+    ? queueBeforeNewBurger.map((orderId) => createBurgerCard(orderId)).join("")
+    : '<div class="burger-card-empty">Очередь выдачи пуста</div>'
+
+  document.body.appendChild(travelCard)
+
+  const deltaX = targetRect.left - startLeft
+  const deltaY = targetRect.top - startTop
+
+  const animation = travelCard.animate(
+    [
+      {
+        transform: "translate(0, 0) scale(1)",
+        opacity: 1
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+        opacity: 1
+      }
+    ],
+    {
+      duration: 3000,
+      easing: "ease-in-out",
+      fill: "forwards"
+    }
+  )
+
+  animation.onfinish = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  animation.oncancel = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  return entity_id
+}
+
+function animateWaiterGoToClient(entity_id) {
+  const queueCards = waiterQueue.querySelectorAll(".burger-card")
+  const startCard = queueCards[0]
+
+  if (!startCard) {
+    renderWaiter()
+    return entity_id
+  }
+
+  const startRect = startCard.getBoundingClientRect()
+  const targetRect = getWaiterCurrentOrderTargetRect()
+
+  const travelCard = startCard.cloneNode(true)
+  travelCard.style.position = "fixed"
+  travelCard.style.zIndex = "20"
+  travelCard.style.pointerEvents = "none"
+  travelCard.style.margin = "0"
+  travelCard.style.left = `${startRect.left}px`
+  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.width = `${startRect.width}px`
+
+  waiterCurrentClient.innerHTML = '<div class="burger-card-empty">Нет текущего заказа</div>'
+  waiterQueue.innerHTML = state.waiter.queue.length
+    ? state.waiter.queue.map((orderId) => createBurgerCard(orderId)).join("")
+    : '<div class="burger-card-empty">Очередь выдачи пуста</div>'
+
+  document.body.appendChild(travelCard)
+
+  const deltaX = targetRect.left - startRect.left
+  const deltaY = targetRect.top - startRect.top
+
+  const animation = travelCard.animate(
+    [
+      {
+        transform: "translate(0, 0) scale(1)",
+        opacity: 1
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(0.96)`,
+        opacity: 1
+      }
+    ],
+    {
+      duration: 3000,
+      easing: "ease-in-out",
+      fill: "forwards"
+    }
+  )
+
+  animation.onfinish = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  animation.oncancel = () => {
+    travelCard.remove()
+    renderWaiter()
+  }
+
+  return entity_id
+}
+
 function getCashierCurrentClientTargetRect() {
   const existingCard = cashierCurrentClient.querySelector(".client-card")
   if (existingCard) {
@@ -678,23 +812,49 @@ function getKitchenDoingTargetRect() {
   }
 }
 
-function getWaiterQueueTargetRect() {
-  const emptyState = waiterQueue.querySelector(".client-card-empty")
-  if (emptyState) {
-    const rect = emptyState.getBoundingClientRect()
+function getWaiterCurrentOrderTargetRect() {
+  const existingCard = waiterCurrentClient.querySelector(".burger-card")
+  if (existingCard) {
+    const rect = existingCard.getBoundingClientRect()
     return {
-      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
+      left: rect.left,
       top: rect.top
     }
   }
 
-  const cards = waiterQueue.querySelectorAll(".client-card")
+  const emptyState = waiterCurrentClient.querySelector(".burger-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - burgerCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const rect = waiterCurrentClient.getBoundingClientRect()
+  return {
+    left: rect.left + Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2),
+    top: rect.top
+  }
+}
+
+function getWaiterQueueTargetRect() {
+  const emptyState = waiterQueue.querySelector(".burger-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - burgerCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const cards = waiterQueue.querySelectorAll(".burger-card")
   const lastCard = cards[cards.length - 1]
 
   if (!lastCard) {
     const rect = waiterQueue.getBoundingClientRect()
     return {
-      left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
+      left: rect.left + Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2),
       top: rect.top
     }
   }
