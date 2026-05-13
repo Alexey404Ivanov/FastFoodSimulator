@@ -5,11 +5,7 @@ from time import monotonic
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
-from src.contracts.simulation import (
-    SimulationPausedEvent,
-    SimulationStartedEvent,
-    OrderDoneEvent
-)
+from src.contracts.simulation import OrderDoneEvent, SimulationPausedEvent, SimulationStartedEvent
 from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 
 

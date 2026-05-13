@@ -111,7 +111,7 @@ class SimulationStateRepository:
                     "type": "worker_started_job",
                     "data": {
                         "worker_name": worker_name,
-                        "waiter_started_work_at": started_at
+                        "waiter_started_work_at": started_at.isoformat()
                     }
                 }),
             )

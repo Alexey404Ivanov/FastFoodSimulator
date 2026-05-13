@@ -9,16 +9,23 @@ const kitchenDoing = document.getElementById("kitchenDoing")
 const kitchenQueue = document.getElementById("kitchenQueue")
 const kitchenWorkerImage = document.querySelector(".worker-node-root > img")
 const cashierWorkerImage = document.querySelector(".worker-node-cashier > img")
+const waiterWorkerImage = document.querySelector(".worker-node-waiter > img")
 const cashierCurrentClient = document.getElementById("cashierCurrentClient")
 const cashierQueue = document.getElementById("cashierQueue")
 const waiterCurrentClient = document.getElementById("waiterCurrentClient")
-const waiterQueue = document.getElementById("waiterQueue")
+const waiterClientQueue = document.getElementById("waiterClientQueue")
+const waiterBurgerQueue = document.getElementById("waiterBurgerQueue")
+const waiterTableImage = document.querySelector(".waiter-table-node > img")
 const workerScale = Number.parseFloat(
   getComputedStyle(document.documentElement).getPropertyValue("--worker-scale")
 ) || 1
 const clientCardVisualWidth = 92 * workerScale
 const ticketCardVisualWidth = 92 * workerScale
 const burgerCardVisualWidth = 92 * workerScale
+const waiterTravelVisualWidth = 118 * workerScale
+const waiterIdleImageSrc = "../static/images/workers/waiter.svg"
+const waiterInWorkImageSrc = "../static/images/workers/waiter_in_work.svg"
+let waiterClientQueueState = []
 
 let state = {
   status: "paused",
@@ -134,7 +141,7 @@ function handleWorkerStartedJob(data) {
       break
 
     case "waiter":
-      handleWaiterStartedJob()
+      handleWaiterStartedJob(data.waiter_started_work_at)
       break
 
     default:
@@ -158,10 +165,19 @@ function handleKitchenStartedJob() {
   animateKitchenStartedJob(nextTicketId)
 }
 
-function handleWaiterStartedJob() {
+function handleWaiterStartedJob(started_at) {
   const nextOrderId = state.waiter.queue.shift()
+
+  if (nextOrderId === null || nextOrderId === undefined) {
+    return
+  }
+
   state.waiter.doing = nextOrderId
-  animateWaiterGoToClient(nextOrderId)
+  state.waiter_started_work_time = started_at ?? state.waiter_started_work_time
+
+  const progress = getWaiterProgressMs(state.waiter_started_work_time)
+  renderWaiter()
+  animateWaiterGoToClient(nextOrderId, progress)
 }
 
 function handleWorkerFinishedJob(data) {
@@ -213,10 +229,13 @@ function handleWaiterFinishedJob() {
   }
 
   state.waiter.doing = null
+  state.waiter_started_work_time = null
+  setWaiterWorkerImage(false)
   renderWaiter()
 }
 
 function handleInit(msg) {
+  waiterClientQueueState = []
   state = {
     status: msg.data?.status ?? "paused",
     cashier: {
@@ -237,6 +256,18 @@ function handleInit(msg) {
   console.log(state)
 
   renderAll()
+
+  if (
+    state.status === "running" &&
+    state.waiter?.doing !== null &&
+    state.waiter?.doing !== undefined &&
+    state.waiter_started_work_time
+  ) {
+    animateWaiterGoToClient(
+      state.waiter.doing,
+      getWaiterProgressMs(state.waiter_started_work_time)
+    )
+  }
 }
 
 function handleStatusUpdated(msg) {
@@ -298,16 +329,28 @@ function renderKitchen() {
 
 function renderWaiter() {
   waiterCurrentClient.innerHTML = state.waiter?.doing
-    ? createBurgerCard(state.waiter.doing)
-    : '<div class="burger-card-empty">Нет текущего заказа</div>'
+    ? createClientCard(state.waiter.doing)
+    : '<div class="client-card-empty">Нет текущего клиента</div>'
 
   if (!state.waiter?.queue?.length) {
-    waiterQueue.innerHTML = '<div class="burger-card-empty">Очередь выдачи пуста</div>'
+    waiterBurgerQueue.innerHTML = '<div class="burger-card-empty">Очередь выдачи пуста</div>'
+  } else {
+    waiterBurgerQueue.innerHTML = state.waiter.queue
+      .map((orderId) => createBurgerCard(orderId))
+      .join("")
+  }
+
+  renderWaiterClientQueue()
+}
+
+function renderWaiterClientQueue() {
+  if (!waiterClientQueueState.length) {
+    waiterClientQueue.innerHTML = '<div class="client-card-empty">Очередь клиентов пуста</div>'
     return
   }
 
-  waiterQueue.innerHTML = state.waiter.queue
-    .map((orderId) => createBurgerCard(orderId))
+  waiterClientQueue.innerHTML = waiterClientQueueState
+    .map((clientId) => createClientCard(clientId))
     .join("")
 }
 
@@ -334,6 +377,15 @@ function createBurgerCard(orderId) {
     <div class="burger-card">
       <div class="burger-card-number">#${orderId}</div>
       <img src="../static/images/burger.svg" alt="Burger #${orderId}">
+    </div>
+  `
+}
+
+function createWaiterTravelCard(orderId) {
+  return `
+    <div class="waiter-travel-card">
+      <div class="waiter-travel-card-number">#${orderId}</div>
+      <img src="../static/images/waiter_with_burger.svg" alt="Waiter with burger #${orderId}">
     </div>
   `
 }
@@ -448,10 +500,9 @@ function animateClientDoneWithCashier(entity_id) {
   }
 
   const startRect = startCard.getBoundingClientRect()
-  const targetRect = {
-    left: startRect.left + clientCardVisualWidth * 0.4,
-    top: startRect.top + 140 * workerScale
-  }
+  waiterClientQueueState.push(currentClientId)
+  const targetRect = getWaiterClientQueueTargetRect()
+  const queueBeforeNewClient = waiterClientQueueState.slice(0, -1)
 
   const travelCard = startCard.cloneNode(true)
   travelCard.classList.remove("client-card-arriving")
@@ -460,6 +511,9 @@ function animateClientDoneWithCashier(entity_id) {
   travelCard.style.top = `${startRect.top}px`
   travelCard.style.width = `${startRect.width}px`
   renderCashier()
+  waiterClientQueue.innerHTML = queueBeforeNewClient.length
+    ? queueBeforeNewClient.map((clientId) => createClientCard(clientId)).join("")
+    : '<div class="client-card-empty">Очередь клиентов пуста</div>'
   document.body.appendChild(travelCard)
 
 
@@ -486,10 +540,12 @@ function animateClientDoneWithCashier(entity_id) {
 
   animation.onfinish = () => {
     travelCard.remove()
+    renderWaiterClientQueue()
   }
 
   animation.oncancel = () => {
     travelCard.remove()
+    renderWaiterClientQueue()
   }
 
   return currentClientId
@@ -626,7 +682,7 @@ function animateOrderDone(entity_id) {
   }
 
   const startRect = kitchenWorkerImage.getBoundingClientRect()
-  const targetRect = getWaiterQueueTargetRect()
+  const targetRect = getWaiterBurgerQueueTargetRect()
   const queueBeforeNewBurger = state.waiter.queue.slice(0, -1)
   const startLeft = startRect.left + (startRect.width - burgerCardVisualWidth) / 2
   const startTop = startRect.top + startRect.height - 16 * workerScale
@@ -639,7 +695,7 @@ function animateOrderDone(entity_id) {
   travelCard.style.top = `${startTop}px`
   travelCard.style.width = `${burgerCardVisualWidth}px`
 
-  waiterQueue.innerHTML = queueBeforeNewBurger.length
+  waiterBurgerQueue.innerHTML = queueBeforeNewBurger.length
     ? queueBeforeNewBurger.map((orderId) => createBurgerCard(orderId)).join("")
     : '<div class="burger-card-empty">Очередь выдачи пуста</div>'
 
@@ -679,36 +735,43 @@ function animateOrderDone(entity_id) {
   return entity_id
 }
 
-function animateWaiterGoToClient(entity_id) {
-  const queueCards = waiterQueue.querySelectorAll(".burger-card")
-  const startCard = queueCards[0]
+function animateWaiterGoToClient(entity_id, progress = 0) {
+  const waiterIntervalMs = getWaiterIntervalMs()
+  const clampedProgress = Math.max(0, Math.min(progress, waiterIntervalMs))
+  const remainingDuration = Math.max(0, waiterIntervalMs - clampedProgress)
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = createWaiterTravelCard(entity_id).trim()
+  const travelCard = wrapper.firstElementChild
 
-  if (!startCard) {
+  if (!travelCard || !waiterCurrentClient) {
+    return entity_id
+  }
+
+  waiterCurrentClient.innerHTML = '<div class="client-card-empty">Нет текущего клиента</div>'
+  const routeStartRect = getWaiterDeliveryStartRect()
+  const targetRect = getWaiterCurrentClientTargetRect()
+  const fullDeltaX = targetRect.left - routeStartRect.left
+  const fullDeltaY = targetRect.top - routeStartRect.top
+  const progressRatio = waiterIntervalMs > 0 ? clampedProgress / waiterIntervalMs : 1
+  const startLeft = routeStartRect.left + fullDeltaX * progressRatio
+  const startTop = routeStartRect.top + fullDeltaY * progressRatio
+
+  setWaiterWorkerImage(true)
+  travelCard.style.left = `${startLeft}px`
+  travelCard.style.top = `${startTop}px`
+  travelCard.style.width = `${waiterTravelVisualWidth}px`
+  document.body.appendChild(travelCard)
+
+  if (remainingDuration <= 0) {
+    travelCard.remove()
+    setWaiterWorkerImage(false)
+    removeWaiterClientFromQueue(entity_id)
     renderWaiter()
     return entity_id
   }
 
-  const startRect = startCard.getBoundingClientRect()
-  const targetRect = getWaiterCurrentOrderTargetRect()
-
-  const travelCard = startCard.cloneNode(true)
-  travelCard.style.position = "fixed"
-  travelCard.style.zIndex = "20"
-  travelCard.style.pointerEvents = "none"
-  travelCard.style.margin = "0"
-  travelCard.style.left = `${startRect.left}px`
-  travelCard.style.top = `${startRect.top}px`
-  travelCard.style.width = `${startRect.width}px`
-
-  waiterCurrentClient.innerHTML = '<div class="burger-card-empty">Нет текущего заказа</div>'
-  waiterQueue.innerHTML = state.waiter.queue.length
-    ? state.waiter.queue.map((orderId) => createBurgerCard(orderId)).join("")
-    : '<div class="burger-card-empty">Очередь выдачи пуста</div>'
-
-  document.body.appendChild(travelCard)
-
-  const deltaX = targetRect.left - startRect.left
-  const deltaY = targetRect.top - startRect.top
+  const deltaX = targetRect.left - startLeft
+  const deltaY = targetRect.top - startTop
 
   const animation = travelCard.animate(
     [
@@ -722,7 +785,7 @@ function animateWaiterGoToClient(entity_id) {
       }
     ],
     {
-      duration: 3000,
+      duration: remainingDuration,
       easing: "ease-in-out",
       fill: "forwards"
     }
@@ -730,11 +793,14 @@ function animateWaiterGoToClient(entity_id) {
 
   animation.onfinish = () => {
     travelCard.remove()
+    setWaiterWorkerImage(false)
+    removeWaiterClientFromQueue(entity_id)
     renderWaiter()
   }
 
   animation.oncancel = () => {
     travelCard.remove()
+    setWaiterWorkerImage(false)
     renderWaiter()
   }
 
@@ -812,8 +878,8 @@ function getKitchenDoingTargetRect() {
   }
 }
 
-function getWaiterCurrentOrderTargetRect() {
-  const existingCard = waiterCurrentClient.querySelector(".burger-card")
+function getWaiterCurrentClientTargetRect() {
+  const existingCard = waiterCurrentClient.querySelector(".client-card")
   if (existingCard) {
     const rect = existingCard.getBoundingClientRect()
     return {
@@ -822,24 +888,48 @@ function getWaiterCurrentOrderTargetRect() {
     }
   }
 
-  const emptyState = waiterCurrentClient.querySelector(".burger-card-empty")
+  const emptyState = waiterCurrentClient.querySelector(".client-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
     return {
-      left: rect.left + (rect.width - burgerCardVisualWidth) / 2,
+      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
       top: rect.top
     }
   }
 
   const rect = waiterCurrentClient.getBoundingClientRect()
   return {
-    left: rect.left + Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2),
+    left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
     top: rect.top
   }
 }
 
-function getWaiterQueueTargetRect() {
-  const emptyState = waiterQueue.querySelector(".burger-card-empty")
+function getWaiterDeliveryStartRect() {
+  if (waiterTableImage) {
+    const rect = waiterTableImage.getBoundingClientRect()
+    return {
+      left: rect.left + rect.width * 0.58 - waiterTravelVisualWidth / 2,
+      top: rect.top - 24 * workerScale
+    }
+  }
+
+  if (waiterWorkerImage) {
+    const rect = waiterWorkerImage.getBoundingClientRect()
+    return {
+      left: rect.left + rect.width / 2 - waiterTravelVisualWidth / 2,
+      top: rect.top + rect.height / 2 - waiterTravelVisualWidth / 2
+    }
+  }
+
+  const rect = waiterBurgerQueue.getBoundingClientRect()
+  return {
+    left: rect.left + Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2),
+    top: rect.top
+  }
+}
+
+function getWaiterBurgerQueueTargetRect() {
+  const emptyState = waiterBurgerQueue.querySelector(".burger-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
     return {
@@ -848,11 +938,11 @@ function getWaiterQueueTargetRect() {
     }
   }
 
-  const cards = waiterQueue.querySelectorAll(".burger-card")
+  const cards = waiterBurgerQueue.querySelectorAll(".burger-card")
   const lastCard = cards[cards.length - 1]
 
   if (!lastCard) {
-    const rect = waiterQueue.getBoundingClientRect()
+    const rect = waiterBurgerQueue.getBoundingClientRect()
     return {
       left: rect.left + Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2),
       top: rect.top
@@ -864,6 +954,75 @@ function getWaiterQueueTargetRect() {
     left: rect.left,
     top: rect.top
   }
+}
+
+function getWaiterClientQueueTargetRect() {
+  const emptyState = waiterClientQueue.querySelector(".client-card-empty")
+  if (emptyState) {
+    const rect = emptyState.getBoundingClientRect()
+    return {
+      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
+      top: rect.top
+    }
+  }
+
+  const cards = waiterClientQueue.querySelectorAll(".client-card")
+  const lastCard = cards[cards.length - 1]
+
+  if (!lastCard) {
+    const rect = waiterClientQueue.getBoundingClientRect()
+    return {
+      left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
+      top: rect.top
+    }
+  }
+
+  const rect = lastCard.getBoundingClientRect()
+  return {
+    left: rect.left,
+    top: rect.top
+  }
+}
+
+function removeWaiterClientFromQueue(entity_id) {
+  const clientIndex = waiterClientQueueState.indexOf(entity_id)
+
+  if (clientIndex !== -1) {
+    waiterClientQueueState.splice(clientIndex, 1)
+    return
+  }
+
+  if (waiterClientQueueState.length) {
+    waiterClientQueueState.shift()
+  }
+}
+
+function getWaiterIntervalMs() {
+  const rawValue = Number(state.waiter_interval)
+
+  if (!Number.isFinite(rawValue) || rawValue <= 0) {
+    return 3000
+  }
+
+  return rawValue < 1000 ? rawValue * 1000 : rawValue
+}
+
+function getWaiterProgressMs(startedAtStr) {
+  const startedAtMs = Date.parse(startedAtStr)
+
+  if (Number.isNaN(startedAtMs)) {
+    return 0
+  }
+
+  return Math.max(0, Date.now() - startedAtMs)
+}
+
+function setWaiterWorkerImage(isInWork) {
+  if (!waiterWorkerImage) {
+    return
+  }
+
+  waiterWorkerImage.src = isInWork ? waiterInWorkImageSrc : waiterIdleImageSrc
 }
 
 window.debugState = () => console.log(state)
