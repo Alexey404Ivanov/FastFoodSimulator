@@ -26,6 +26,7 @@ const waiterTravelVisualWidth = 118 * workerScale
 const waiterIdleImageSrc = "../static/images/workers/waiter.svg"
 const waiterInWorkImageSrc = "../static/images/workers/waiter_in_work.svg"
 let waiterClientQueueState = []
+let timerIntervalId = null
 
 let state = {
   status: "paused",
@@ -42,7 +43,9 @@ let state = {
     queue: []
   },
   waiter_started_work_time: null,
-  waiter_interval: null
+  waiter_interval: null,
+  worked_time: null,
+  started_at: null
 }
 
 const protocol = window.location.protocol === "https:" ? "wss" : "ws"
@@ -63,6 +66,18 @@ ws.onmessage = (event) => {
   const msg = JSON.parse(event.data)
   console.log(msg)
   handleEvent(msg)
+}
+
+if (continueButton) {
+  continueButton.addEventListener("click", () => {
+    void updateSimulationStatus("continue")
+  })
+}
+
+if (stopButton) {
+  stopButton.addEventListener("click", () => {
+    void updateSimulationStatus("pause")
+  })
 }
 
 function handleEvent(msg) {
@@ -91,6 +106,26 @@ function handleEvent(msg) {
       console.warn("Unknown event:", msg)
   }
 }
+
+async function updateSimulationStatus(action) {
+  const endpoint = `/api/simulation/${action}`
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+  } catch (error) {
+    console.error(`Failed to ${action} simulation:`, error)
+  }
+}
+
 function handleWorkerQueuePushed(data) {
   switch (data.worker_name) {
     case "cashier":
@@ -251,11 +286,14 @@ function handleInit(msg) {
       queue: msg.data?.waiter?.queue ?? []
     },
     waiter_started_work_time: msg.data?.waiter_started_work_time ?? null,
-    waiter_interval: msg.data?.waiter_interval ?? null
+    waiter_interval: msg.data?.waiter_interval ?? null,
+    worked_time: msg.data?.worked_time ?? null,
+    started_at: msg.data?.started_at ?? null
   }
   console.log(state)
 
   renderAll()
+  syncTimerState()
 
   if (
     state.status === "running" &&
@@ -273,7 +311,10 @@ function handleInit(msg) {
 function handleStatusUpdated(msg) {
   const nextStatus = msg.data.status
   state.status = nextStatus
+  state.worked_time = msg.data?.worked_time ?? state.worked_time
+  state.started_at = msg.data?.started_at ?? state.started_at
   renderStatus()
+  syncTimerState()
 }
 
 function renderAll() {
@@ -295,6 +336,80 @@ function renderStatus() {
     stopButton.disabled = isDisabled
     stopButton.setAttribute("aria-disabled", String(isDisabled))
   }
+}
+
+function syncTimerState() {
+  stopTimer()
+
+  if (state.status === "running") {
+    renderTimer(getCurrentWorkedTimeSeconds())
+    startTimer()
+    return
+  }
+
+  renderTimer(getStoredWorkedTimeSeconds())
+}
+
+function startTimer() {
+  if (timerIntervalId !== null) {
+    return
+  }
+
+  timerIntervalId = window.setInterval(() => {
+    renderTimer(getCurrentWorkedTimeSeconds())
+  }, 1000)
+}
+
+function stopTimer() {
+  if (timerIntervalId === null) {
+    return
+  }
+
+  window.clearInterval(timerIntervalId)
+  timerIntervalId = null
+}
+
+function getCurrentWorkedTimeSeconds() {
+  const storedWorkedTimeSeconds = getStoredWorkedTimeSeconds()
+
+  if (state.status !== "running") {
+    return storedWorkedTimeSeconds
+  }
+
+  const startedAtMs = Date.parse(state.started_at)
+
+  if (Number.isNaN(startedAtMs)) {
+    return storedWorkedTimeSeconds
+  }
+
+  return storedWorkedTimeSeconds + Math.max(0, (Date.now() - startedAtMs) / 1000)
+}
+
+function getStoredWorkedTimeSeconds() {
+  const workedTimeSeconds = Number(state.worked_time)
+
+  if (!Number.isFinite(workedTimeSeconds) || workedTimeSeconds < 0) {
+    return 0
+  }
+
+  return workedTimeSeconds
+}
+
+function renderTimer(totalWorkedTimeSeconds) {
+  if (!timerDisplay) {
+    return
+  }
+
+  timerDisplay.textContent = `Время работы симуляции: ${formatWorkedTime(totalWorkedTimeSeconds)}`
+}
+
+function formatWorkedTime(totalWorkedTimeSeconds) {
+  const safeSeconds = Math.max(0, totalWorkedTimeSeconds)
+  const totalSeconds = Math.floor(safeSeconds)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${String(minutes).padStart(2, "0")}.${String(seconds).padStart(2, "0")}`
 }
 
 function renderCashier() {
@@ -389,7 +504,6 @@ function createBurgerCard(orderId) {
 function createWaiterTravelCard(orderId) {
   return `
     <div class="waiter-travel-card">
-      <div class="waiter-travel-card-number">#${orderId}</div>
       <img src="../static/images/waiter_with_burger.svg" alt="Waiter with burger #${orderId}">
     </div>
   `

@@ -23,6 +23,7 @@ class SimulationStateLifecycle:
         pipe.hset(f"{base_key}:waiter", "doing", "")
         pipe.set(f"{base_key}:waiter_started_work_at", "")
         pipe.set(f"{base_key}:waiter_interval", "")
+        pipe.hset(base_key, "worked_time", "0")
         # Выполняем все к
         await pipe.execute()
 

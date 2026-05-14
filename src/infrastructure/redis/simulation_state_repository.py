@@ -2,7 +2,7 @@
 
 from src.infrastructure.redis.provider import RedisProvider
 
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 
 class SimulationStateRepository:
     STATUSES = {"running", "paused"}
@@ -21,6 +21,8 @@ class SimulationStateRepository:
 
         # Запускаем все запросы параллельно
         status_task = self.redis.hget(base_key, "status")
+        worked_time_task = self.redis.hget(base_key, "worked_time")
+        started_at_task = self.redis.hget(base_key, "started_at")
 
         waiter_started_work_time = self.redis.get(f"{base_key}:waiter_started_work_at")
         waiter_interval = self.redis.get(f"{base_key}:waiter_interval")
@@ -31,14 +33,19 @@ class SimulationStateRepository:
             queue_task = self.redis.lrange(f"{base_key}:{worker}:queue", 0, -1)
             workers_tasks[worker] = (doing_task, queue_task)
 
-        # Ждём все результаты
         status = await status_task
+        worked_time = await worked_time_task
+        started_at = await started_at_task
+
         waiter_time = await waiter_started_work_time
         waiter_interval = await waiter_interval
+
         state = {
             "status": status or "paused",
             "waiter_started_work_time": waiter_time,
-            "waiter_interval": waiter_interval
+            "waiter_interval": waiter_interval,
+            "worked_time": worked_time,
+            "started_at": started_at,
         }
 
         for worker, (doing_task, queue_task) in workers_tasks.items():
@@ -52,13 +59,31 @@ class SimulationStateRepository:
         if status not in self.STATUSES:
             return
 
+        if status == "running":
+            started_at = datetime.now(UTC)
+            await self.redis.hset(f"simulation:{1488}", "started_at", started_at.isoformat())
+        else:
+            started_at = await self.redis.hget(f"simulation:{1488}", "started_at")
+            worked_time = await self.redis.hget(f"simulation:{1488}", "worked_time")
+
+            started_at = datetime.fromisoformat(started_at)
+
+            worked_time = timedelta(seconds=float(worked_time))
+
+            worked_time += datetime.now(UTC) - started_at
+            await self.redis.hset(f"simulation:{1488}", "worked_time", str(worked_time.total_seconds()))
+
         await self.redis.hset(f"simulation:{1488}", "status", status)
+        started_at_time = await self.redis.hget(f"simulation:{1488}", "started_at")
+        time = await self.redis.hget(f"simulation:{1488}", "worked_time")
         await self.redis.publish(
             f"simulation:{1488}:events",
             json.dumps({
                 "type": "simulation_status_updated",
                 "data": {
-                    "status": status
+                    "status": status,
+                    "started_at": str(started_at_time),
+                    "worked_time": time
                 }
             }),
         )
