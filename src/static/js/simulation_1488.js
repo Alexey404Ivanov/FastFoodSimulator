@@ -1,6 +1,7 @@
 const simulationId = 1488
 const payloadStorageKey = `simulation:${simulationId}:payload`
 const sessionStartedKey = `simulation:${simulationId}:started`
+const waiterProgressStorageKey = `simulation:${simulationId}:waiter-progress`
 
 const continueButton = document.getElementById("continueButton")
 const stopButton = document.getElementById("pauseButton")
@@ -27,6 +28,12 @@ const waiterIdleImageSrc = "../static/images/workers/waiter.svg"
 const waiterInWorkImageSrc = "../static/images/workers/waiter_in_work.svg"
 let waiterClientQueueState = []
 let timerIntervalId = null
+let waiterTravelState = {
+  entityId: null,
+  card: null,
+  animation: null,
+  progressMs: 0
+}
 
 let state = {
   status: "paused",
@@ -79,6 +86,12 @@ if (stopButton) {
     void updateSimulationStatus("pause")
   })
 }
+
+window.addEventListener("beforeunload", () => {
+  if (state.status === "paused") {
+    pauseWaiterTravel()
+  }
+})
 
 function handleEvent(msg) {
   switch (msg.type) {
@@ -210,7 +223,8 @@ function handleWaiterStartedJob(started_at) {
   state.waiter.doing = nextOrderId
   state.waiter_started_work_time = started_at ?? state.waiter_started_work_time
 
-  const progress = getWaiterProgressMs(state.waiter_started_work_time)
+  const savedProgress = getSavedWaiterProgress(nextOrderId)
+  const progress = savedProgress ?? getWaiterProgressMs(state.waiter_started_work_time)
   renderWaiter()
   animateWaiterGoToClient(nextOrderId, progress)
 }
@@ -263,6 +277,8 @@ function handleWaiterFinishedJob() {
     return
   }
 
+  clearWaiterTravelState()
+  clearSavedWaiterProgress()
   state.waiter.doing = null
   state.waiter_started_work_time = null
   setWaiterWorkerImage(false)
@@ -270,7 +286,6 @@ function handleWaiterFinishedJob() {
 }
 
 function handleInit(msg) {
-  waiterClientQueueState = []
   state = {
     status: msg.data?.status ?? "paused",
     cashier: {
@@ -290,10 +305,12 @@ function handleInit(msg) {
     worked_time: msg.data?.worked_time ?? null,
     started_at: msg.data?.started_at ?? null
   }
+  waiterClientQueueState = buildWaiterClientQueueStateFromState()
   console.log(state)
 
   renderAll()
   syncTimerState()
+  restoreWaiterTravelState()
 
   if (
     state.status === "running" &&
@@ -303,18 +320,20 @@ function handleInit(msg) {
   ) {
     animateWaiterGoToClient(
       state.waiter.doing,
-      getWaiterProgressMs(state.waiter_started_work_time)
+      getSavedWaiterProgress(state.waiter.doing) ?? getWaiterProgressMs(state.waiter_started_work_time)
     )
   }
 }
 
 function handleStatusUpdated(msg) {
+  const previousStatus = state.status
   const nextStatus = msg.data.status
   state.status = nextStatus
   state.worked_time = msg.data?.worked_time ?? state.worked_time
   state.started_at = msg.data?.started_at ?? state.started_at
   renderStatus()
   syncTimerState()
+  syncWaiterTravelStatus(previousStatus, nextStatus)
 }
 
 function renderAll() {
@@ -410,6 +429,206 @@ function formatWorkedTime(totalWorkedTimeSeconds) {
   const seconds = totalSeconds % 60
 
   return `${String(minutes).padStart(2, "0")}.${String(seconds).padStart(2, "0")}`
+}
+
+function syncWaiterTravelStatus(previousStatus, nextStatus) {
+  if (previousStatus === nextStatus) {
+    return
+  }
+
+  if (nextStatus === "paused") {
+    pauseWaiterTravel()
+    return
+  }
+
+  if (nextStatus === "running") {
+    resumeWaiterTravel()
+  }
+}
+
+function restoreWaiterTravelState() {
+  clearWaiterTravelState()
+
+  const currentOrderId = state.waiter?.doing
+
+  if (currentOrderId === null || currentOrderId === undefined) {
+    clearSavedWaiterProgress()
+    return
+  }
+
+  if (state.status === "paused") {
+    const savedProgress = getSavedWaiterProgress(currentOrderId)
+
+    if (savedProgress !== null) {
+      renderPausedWaiterTravel(currentOrderId, savedProgress)
+    }
+  }
+}
+
+function pauseWaiterTravel() {
+  if (!waiterTravelState.card) {
+    const currentOrderId = state.waiter?.doing
+
+    if (currentOrderId !== null && currentOrderId !== undefined) {
+      const fallbackProgress = getSavedWaiterProgress(currentOrderId) ?? getWaiterProgressMs(state.waiter_started_work_time)
+      renderPausedWaiterTravel(currentOrderId, fallbackProgress)
+    }
+
+    return
+  }
+
+  if (waiterTravelState.animation) {
+    waiterTravelState.animation.pause()
+  }
+
+  waiterTravelState.progressMs = getCurrentWaiterTravelProgress()
+  persistWaiterTravelProgress(waiterTravelState.entityId, waiterTravelState.progressMs)
+}
+
+function resumeWaiterTravel() {
+  const currentOrderId = state.waiter?.doing
+
+  if (currentOrderId === null || currentOrderId === undefined) {
+    clearWaiterTravelState()
+    clearSavedWaiterProgress()
+    return
+  }
+
+  if (
+    waiterTravelState.card &&
+    waiterTravelState.animation &&
+    waiterTravelState.entityId === currentOrderId
+  ) {
+    waiterTravelState.animation.play()
+    clearSavedWaiterProgress()
+    return
+  }
+
+  const savedProgress = getSavedWaiterProgress(currentOrderId)
+
+  if (savedProgress !== null) {
+    animateWaiterGoToClient(currentOrderId, savedProgress)
+    clearSavedWaiterProgress()
+  }
+}
+
+function getCurrentWaiterTravelProgress() {
+  if (!waiterTravelState.animation) {
+    return Math.max(0, waiterTravelState.progressMs || 0)
+  }
+
+  const currentTime = Number(waiterTravelState.animation.currentTime)
+
+  if (!Number.isFinite(currentTime)) {
+    return Math.max(0, waiterTravelState.progressMs || 0)
+  }
+
+  return Math.max(0, currentTime)
+}
+
+function persistWaiterTravelProgress(entityId, progressMs) {
+  if (entityId === null || entityId === undefined) {
+    clearSavedWaiterProgress()
+    return
+  }
+
+  try {
+    window.localStorage.setItem(waiterProgressStorageKey, JSON.stringify({
+      entityId,
+      progressMs: Math.max(0, progressMs)
+    }))
+  } catch (error) {
+    console.warn("Failed to persist waiter progress:", error)
+  }
+}
+
+function getSavedWaiterProgress(entityId) {
+  if (entityId === null || entityId === undefined) {
+    return null
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(waiterProgressStorageKey)
+
+    if (!rawValue) {
+      return null
+    }
+
+    const parsedValue = JSON.parse(rawValue)
+
+    if (parsedValue?.entityId !== entityId) {
+      return null
+    }
+
+    const progressMs = Number(parsedValue.progressMs)
+
+    if (!Number.isFinite(progressMs) || progressMs < 0) {
+      return null
+    }
+
+    return progressMs
+  } catch (error) {
+    console.warn("Failed to read waiter progress:", error)
+    return null
+  }
+}
+
+function clearSavedWaiterProgress() {
+  try {
+    window.localStorage.removeItem(waiterProgressStorageKey)
+  } catch (error) {
+    console.warn("Failed to clear waiter progress:", error)
+  }
+}
+
+function clearWaiterTravelState() {
+  if (waiterTravelState.animation) {
+    waiterTravelState.animation.onfinish = null
+    waiterTravelState.animation.oncancel = null
+    waiterTravelState.animation.cancel()
+  }
+
+  if (waiterTravelState.card) {
+    waiterTravelState.card.remove()
+  }
+
+  waiterTravelState = {
+    entityId: null,
+    card: null,
+    animation: null,
+    progressMs: 0
+  }
+}
+
+function renderPausedWaiterTravel(entity_id, progress = 0) {
+  const waiterIntervalMs = getWaiterIntervalMs()
+  const clampedProgress = Math.max(0, Math.min(progress, waiterIntervalMs))
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = createWaiterTravelCard(entity_id).trim()
+  const travelCard = wrapper.firstElementChild
+
+  if (!travelCard) {
+    return entity_id
+  }
+
+  clearWaiterTravelState()
+
+  const position = getWaiterTravelPosition(clampedProgress, waiterIntervalMs)
+  setWaiterWorkerImage(true)
+  travelCard.style.left = `${position.left}px`
+  travelCard.style.top = `${position.top}px`
+  travelCard.style.width = `${waiterTravelVisualWidth}px`
+  document.body.appendChild(travelCard)
+
+  waiterTravelState = {
+    entityId: entity_id,
+    card: travelCard,
+    animation: null,
+    progressMs: clampedProgress
+  }
+
+  persistWaiterTravelProgress(entity_id, clampedProgress)
+  return entity_id
 }
 
 function renderCashier() {
@@ -866,13 +1085,12 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
     return entity_id
   }
 
-  const routeStartRect = getWaiterDeliveryStartRect()
-  const targetRect = getWaiterStandTargetRect()
-  const fullDeltaX = targetRect.left - routeStartRect.left
-  const fullDeltaY = targetRect.top - routeStartRect.top
-  const progressRatio = waiterIntervalMs > 0 ? clampedProgress / waiterIntervalMs : 1
-  const startLeft = routeStartRect.left + fullDeltaX * progressRatio
-  const startTop = routeStartRect.top + fullDeltaY * progressRatio
+  clearWaiterTravelState()
+
+  const { left: startLeft, top: startTop, targetLeft, targetTop } = getWaiterTravelPosition(
+    clampedProgress,
+    waiterIntervalMs
+  )
 
   setWaiterWorkerImage(true)
   travelCard.style.left = `${startLeft}px`
@@ -880,16 +1098,25 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
   travelCard.style.width = `${waiterTravelVisualWidth}px`
   document.body.appendChild(travelCard)
 
+  waiterTravelState = {
+    entityId: entity_id,
+    card: travelCard,
+    animation: null,
+    progressMs: clampedProgress
+  }
+
   if (remainingDuration <= 0) {
+    clearSavedWaiterProgress()
     travelCard.remove()
+    waiterTravelState.card = null
     setWaiterWorkerImage(false)
     removeWaiterClientFromQueue(entity_id)
     renderWaiter()
     return entity_id
   }
 
-  const deltaX = targetRect.left - startLeft
-  const deltaY = targetRect.top - startTop
+  const deltaX = targetLeft - startLeft
+  const deltaY = targetTop - startTop
 
   const animation = travelCard.animate(
     [
@@ -909,8 +1136,14 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
     }
   )
 
+  waiterTravelState.animation = animation
+
   animation.onfinish = () => {
+    clearSavedWaiterProgress()
     travelCard.remove()
+    waiterTravelState.card = null
+    waiterTravelState.animation = null
+    waiterTravelState.progressMs = waiterIntervalMs
     setWaiterWorkerImage(false)
     removeWaiterClientFromQueue(entity_id)
     renderWaiter()
@@ -918,11 +1151,29 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
 
   animation.oncancel = () => {
     travelCard.remove()
-    setWaiterWorkerImage(false)
-    renderWaiter()
+
+    if (state.status !== "paused") {
+      setWaiterWorkerImage(false)
+      renderWaiter()
+    }
   }
 
   return entity_id
+}
+
+function getWaiterTravelPosition(progressMs, waiterIntervalMs = getWaiterIntervalMs()) {
+  const routeStartRect = getWaiterDeliveryStartRect()
+  const targetRect = getWaiterStandTargetRect()
+  const fullDeltaX = targetRect.left - routeStartRect.left
+  const fullDeltaY = targetRect.top - routeStartRect.top
+  const progressRatio = waiterIntervalMs > 0 ? progressMs / waiterIntervalMs : 1
+
+  return {
+    left: routeStartRect.left + fullDeltaX * progressRatio,
+    top: routeStartRect.top + fullDeltaY * progressRatio,
+    targetLeft: targetRect.left,
+    targetTop: targetRect.top
+  }
 }
 
 function getCashierCurrentClientTargetRect() {
@@ -1128,15 +1379,16 @@ function getWaiterVisibleClientId() {
     return state.waiter.doing
   }
 
-  return waiterClientQueueState[0] ?? null
+  return null
 }
 
 function getWaiterQueuedClients(currentClientId) {
+  const visibleQueue = waiterClientQueueState.slice()
+
   if (currentClientId === null || currentClientId === undefined) {
-    return waiterClientQueueState.slice()
+    return visibleQueue
   }
 
-  const visibleQueue = waiterClientQueueState.slice()
   const currentClientIndex = visibleQueue.indexOf(currentClientId)
 
   if (currentClientIndex !== -1) {
@@ -1144,6 +1396,34 @@ function getWaiterQueuedClients(currentClientId) {
   }
 
   return visibleQueue
+}
+
+function buildWaiterClientQueueStateFromState() {
+  const waitingClientIds = []
+  const currentWaiterClientId = state.waiter?.doing
+  const enqueueClientId = (clientId) => {
+    if (clientId === null || clientId === undefined) {
+      return
+    }
+
+    if (clientId === currentWaiterClientId) {
+      return
+    }
+
+    waitingClientIds.push(clientId)
+  }
+
+  enqueueClientId(state.kitchen?.doing)
+
+  if (Array.isArray(state.kitchen?.queue)) {
+    state.kitchen.queue.forEach(enqueueClientId)
+  }
+
+  if (Array.isArray(state.waiter?.queue)) {
+    state.waiter.queue.forEach(enqueueClientId)
+  }
+
+  return waitingClientIds
 }
 
 function getWaiterIntervalMs() {
