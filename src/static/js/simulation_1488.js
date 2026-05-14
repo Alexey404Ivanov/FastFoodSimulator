@@ -615,6 +615,7 @@ function renderPausedWaiterTravel(entity_id, progress = 0) {
 
   const position = getWaiterTravelPosition(clampedProgress, waiterIntervalMs)
   setWaiterWorkerImage(true)
+  travelCard.style.position = "absolute"
   travelCard.style.left = `${position.left}px`
   travelCard.style.top = `${position.top}px`
   travelCard.style.width = `${waiterTravelVisualWidth}px`
@@ -728,6 +729,13 @@ function createWaiterTravelCard(orderId) {
   `
 }
 
+function getDocumentPoint(rect, width = 0) {
+  return {
+    left: rect.left + window.scrollX + width,
+    top: rect.top + window.scrollY
+  }
+}
+
 function animateClientArrived(entity_id) {
   if (!state.cashier) {
     state.cashier = { doing: null, queue: [] }
@@ -772,10 +780,10 @@ function animateCreatedNewOrder(entity_id) {
   const startRect = cashierWorkerImage.getBoundingClientRect()
   const targetRect = getKitchenQueueTargetRect()
   const queueBeforeNewTicket = state.kitchen.queue.slice(0, -1)
-  const startLeft = startRect.left + (startRect.width - ticketCardVisualWidth) / 2
-  const startTop = startRect.top - 28 * workerScale
+  const startLeft = startRect.left + window.scrollX + (startRect.width - ticketCardVisualWidth) / 2
+  const startTop = startRect.top + window.scrollY - 28 * workerScale
 
-  travelCard.style.position = "fixed"
+  travelCard.style.position = "absolute"
   travelCard.style.zIndex = "20"
   travelCard.style.pointerEvents = "none"
   travelCard.style.margin = "0"
@@ -841,12 +849,14 @@ function animateClientDoneWithCashier(entity_id) {
   waiterClientQueueState.push(currentClientId)
   const targetRect = getWaiterClientQueueTargetRect()
   const queueBeforeNewClient = waiterClientQueueState.slice(0, -1)
+  const startPoint = getDocumentPoint(startRect)
 
   const travelCard = startCard.cloneNode(true)
   travelCard.classList.remove("client-card-arriving")
   travelCard.classList.add("client-card-travel")
-  travelCard.style.left = `${startRect.left}px`
-  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.position = "absolute"
+  travelCard.style.left = `${startPoint.left}px`
+  travelCard.style.top = `${startPoint.top}px`
   travelCard.style.width = `${startRect.width}px`
   renderCashier()
   waiterClientQueue.innerHTML = queueBeforeNewClient.length
@@ -855,8 +865,8 @@ function animateClientDoneWithCashier(entity_id) {
   document.body.appendChild(travelCard)
 
 
-  const deltaX = targetRect.left - startRect.left
-  const deltaY = targetRect.top - startRect.top
+  const deltaX = targetRect.left - startPoint.left
+  const deltaY = targetRect.top - startPoint.top
 
   const animation = travelCard.animate(
     [
@@ -900,12 +910,14 @@ function animateCashierStartedJob(entity_id) {
 
   const startRect = startCard.getBoundingClientRect()
   const targetRect = getCashierCurrentClientTargetRect()
+  const startPoint = getDocumentPoint(startRect)
 
   const travelCard = startCard.cloneNode(true)
   travelCard.classList.remove("client-card-arriving")
   travelCard.classList.add("client-card-travel")
-  travelCard.style.left = `${startRect.left}px`
-  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.position = "absolute"
+  travelCard.style.left = `${startPoint.left}px`
+  travelCard.style.top = `${startPoint.top}px`
   travelCard.style.width = `${startRect.width}px`
   cashierCurrentClient.innerHTML = '<div class="client-card-empty">Нет клиента</div>'
   cashierQueue.innerHTML = state.cashier.queue.length
@@ -913,8 +925,8 @@ function animateCashierStartedJob(entity_id) {
     : '<div class="client-card-empty">Очередь пуста</div>'
   document.body.appendChild(travelCard)
 
-  const deltaX = targetRect.left - startRect.left
-  const deltaY = targetRect.top - startRect.top
+  const deltaX = targetRect.left - startPoint.left
+  const deltaY = targetRect.top - startPoint.top
 
   const animation = travelCard.animate(
     [
@@ -958,14 +970,15 @@ function animateKitchenStartedJob(entity_id) {
 
   const startRect = startCard.getBoundingClientRect()
   const targetRect = getKitchenDoingTargetRect()
+  const startPoint = getDocumentPoint(startRect)
 
   const travelCard = startCard.cloneNode(true)
-  travelCard.style.position = "fixed"
+  travelCard.style.position = "absolute"
   travelCard.style.zIndex = "20"
   travelCard.style.pointerEvents = "none"
   travelCard.style.margin = "0"
-  travelCard.style.left = `${startRect.left}px`
-  travelCard.style.top = `${startRect.top}px`
+  travelCard.style.left = `${startPoint.left}px`
+  travelCard.style.top = `${startPoint.top}px`
   travelCard.style.width = `${startRect.width}px`
 
   kitchenDoing.innerHTML = '<div class="ticket-card-empty">Нет текущего заказа</div>'
@@ -975,8 +988,8 @@ function animateKitchenStartedJob(entity_id) {
 
   document.body.appendChild(travelCard)
 
-  const deltaX = targetRect.left - startRect.left
-  const deltaY = targetRect.top - startRect.top
+  const deltaX = targetRect.left - startPoint.left
+  const deltaY = targetRect.top - startPoint.top
 
   const animation = travelCard.animate(
     [
@@ -1022,10 +1035,10 @@ function animateOrderDone(entity_id) {
   const startRect = kitchenWorkerImage.getBoundingClientRect()
   const targetRect = getWaiterBurgerQueueTargetRect()
   const queueBeforeNewBurger = state.waiter.queue.slice(0, -1)
-  const startLeft = startRect.left + (startRect.width - burgerCardVisualWidth) / 2
-  const startTop = startRect.top + startRect.height - 16 * workerScale
+  const startLeft = startRect.left + window.scrollX + (startRect.width - burgerCardVisualWidth) / 2
+  const startTop = startRect.top + window.scrollY + startRect.height - 16 * workerScale
 
-  travelCard.style.position = "fixed"
+  travelCard.style.position = "absolute"
   travelCard.style.zIndex = "20"
   travelCard.style.pointerEvents = "none"
   travelCard.style.margin = "0"
@@ -1093,6 +1106,7 @@ function animateWaiterGoToClient(entity_id, progress = 0) {
   )
 
   setWaiterWorkerImage(true)
+  travelCard.style.position = "absolute"
   travelCard.style.left = `${startLeft}px`
   travelCard.style.top = `${startTop}px`
   travelCard.style.width = `${waiterTravelVisualWidth}px`
@@ -1180,26 +1194,17 @@ function getCashierCurrentClientTargetRect() {
   const existingCard = cashierCurrentClient.querySelector(".client-card")
   if (existingCard) {
     const rect = existingCard.getBoundingClientRect()
-    return {
-      left: rect.left,
-      top: rect.top
-    }
+    return getDocumentPoint(rect)
   }
 
   const emptyState = cashierCurrentClient.querySelector(".client-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - clientCardVisualWidth) / 2)
   }
 
   const rect = cashierCurrentClient.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
-    top: rect.top
-  }
+  return getDocumentPoint(rect, Math.max(0, rect.width / 2 - clientCardVisualWidth / 2))
 }
 
 function getKitchenQueueTargetRect() {
@@ -1208,111 +1213,88 @@ function getKitchenQueueTargetRect() {
 
   if (lastCard) {
     const rect = lastCard.getBoundingClientRect()
-    return {
-      left: rect.left,
-      top: rect.top
-    }
+    return getDocumentPoint(rect)
   }
 
   const emptyState = kitchenQueue.querySelector(".ticket-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - ticketCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - ticketCardVisualWidth) / 2)
   }
 
   const rect = kitchenQueue.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2),
-    top: rect.top
-  }
+  return getDocumentPoint(rect, Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2))
 }
 
 function getKitchenDoingTargetRect() {
   const emptyState = kitchenDoing.querySelector(".ticket-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - ticketCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - ticketCardVisualWidth) / 2)
   }
 
   const rect = kitchenDoing.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2),
-    top: rect.top
-  }
+  return getDocumentPoint(rect, Math.max(0, rect.width / 2 - ticketCardVisualWidth / 2))
 }
 
 function getWaiterCurrentClientTargetRect() {
   const existingCard = waiterCurrentClient.querySelector(".client-card")
   if (existingCard) {
     const rect = existingCard.getBoundingClientRect()
-    return {
-      left: rect.left,
-      top: rect.top
-    }
+    return getDocumentPoint(rect)
   }
 
   const emptyState = waiterCurrentClient.querySelector(".client-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - clientCardVisualWidth) / 2)
   }
 
   const rect = waiterCurrentClient.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
-    top: rect.top
-  }
+  return getDocumentPoint(rect, Math.max(0, rect.width / 2 - clientCardVisualWidth / 2))
 }
 
 function getWaiterStandTargetRect() {
   const rect = waiterCurrentClient.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2),
-    top: rect.top - 72 * workerScale
-  }
+  return getDocumentPoint(
+    {
+      left: rect.left,
+      top: rect.top - 72 * workerScale
+    },
+    Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2)
+  )
 }
 
 function getWaiterDeliveryStartRect() {
   if (waiterTableImage) {
     const rect = waiterTableImage.getBoundingClientRect()
-    return {
-      left: rect.left + rect.width * 0.58 - waiterTravelVisualWidth / 2,
-      top: rect.top - 24 * workerScale
-    }
+    return getDocumentPoint(
+      {
+        left: rect.left + rect.width * 0.58 - waiterTravelVisualWidth / 2,
+        top: rect.top - 24 * workerScale
+      }
+    )
   }
 
   if (waiterWorkerImage) {
     const rect = waiterWorkerImage.getBoundingClientRect()
-    return {
-      left: rect.left + rect.width / 2 - waiterTravelVisualWidth / 2,
-      top: rect.top + rect.height / 2 - waiterTravelVisualWidth / 2
-    }
+    return getDocumentPoint(
+      {
+        left: rect.left + rect.width / 2 - waiterTravelVisualWidth / 2,
+        top: rect.top + rect.height / 2 - waiterTravelVisualWidth / 2
+      }
+    )
   }
 
   const rect = waiterBurgerQueue.getBoundingClientRect()
-  return {
-    left: rect.left + Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2),
-    top: rect.top
-  }
+  return getDocumentPoint(rect, Math.max(0, rect.width / 2 - waiterTravelVisualWidth / 2))
 }
 
 function getWaiterBurgerQueueTargetRect() {
   const emptyState = waiterBurgerQueue.querySelector(".burger-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - burgerCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - burgerCardVisualWidth) / 2)
   }
 
   const cards = waiterBurgerQueue.querySelectorAll(".burger-card")
@@ -1320,27 +1302,18 @@ function getWaiterBurgerQueueTargetRect() {
 
   if (!lastCard) {
     const rect = waiterBurgerQueue.getBoundingClientRect()
-    return {
-      left: rect.left + Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2),
-      top: rect.top
-    }
+    return getDocumentPoint(rect, Math.max(0, rect.width / 2 - burgerCardVisualWidth / 2))
   }
 
   const rect = lastCard.getBoundingClientRect()
-  return {
-    left: rect.left,
-    top: rect.top
-  }
+  return getDocumentPoint(rect)
 }
 
 function getWaiterClientQueueTargetRect() {
   const emptyState = waiterClientQueue.querySelector(".client-card-empty")
   if (emptyState) {
     const rect = emptyState.getBoundingClientRect()
-    return {
-      left: rect.left + (rect.width - clientCardVisualWidth) / 2,
-      top: rect.top
-    }
+    return getDocumentPoint(rect, (rect.width - clientCardVisualWidth) / 2)
   }
 
   const cards = waiterClientQueue.querySelectorAll(".client-card")
@@ -1348,17 +1321,11 @@ function getWaiterClientQueueTargetRect() {
 
   if (!lastCard) {
     const rect = waiterClientQueue.getBoundingClientRect()
-    return {
-      left: rect.left + Math.max(0, rect.width / 2 - clientCardVisualWidth / 2),
-      top: rect.top
-    }
+    return getDocumentPoint(rect, Math.max(0, rect.width / 2 - clientCardVisualWidth / 2))
   }
 
   const rect = lastCard.getBoundingClientRect()
-  return {
-    left: rect.left,
-    top: rect.top
-  }
+  return getDocumentPoint(rect)
 }
 
 function removeWaiterClientFromQueue(entity_id) {
