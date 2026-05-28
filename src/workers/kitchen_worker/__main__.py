@@ -31,6 +31,7 @@ async def main():
         await asyncio.Future()
 
     finally:
+        await RedisProvider.close()
         await connection.close()
 
 if __name__ == "__main__":

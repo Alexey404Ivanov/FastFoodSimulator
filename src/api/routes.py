@@ -1,14 +1,14 @@
 ﻿import asyncio
 import json
-import time
 
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 
 from src.api.dependencies import publisher
-from src.contracts.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent
+from src.contracts.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
 from src.infrastructure.redis.provider import RedisProvider
 from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+
 templates = Jinja2Templates(directory="src/templates")
 
 router = APIRouter()
@@ -22,9 +22,20 @@ async def get_page(request: Request):
     return templates.TemplateResponse(request=request, name="simulation_1488.html")
 
 @router.get("/simulation/state")
-async def get_state(request: Request):
+async def get_state():
     repo = SimulationStateRepository()
     return await repo.get_state()
+
+@router.get("/api/simulation/settings")
+async def get_sim_settings():
+    repo = SimulationStateRepository()
+    return await repo.get_workers_intervals()
+
+@router.post("/api/simulation/settings")
+async def update_sim_settings(body: SimulationUpdatedEvent):
+    await publisher.publish(event_name="simulation.updated", event=body)
+    # repo = SimulationStateRepository()
+    # await repo.update_workers_intervals(body.workers)
 
 @router.post("/api/simulation/start")
 async def start_simulation(body: SimulationStartedEvent):

@@ -10,6 +10,7 @@ from src.contracts.simulation import (
     OrderCreatedEvent,
     SimulationPausedEvent,
     SimulationStartedEvent,
+    SimulationUpdatedEvent,
 )
 from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 
@@ -36,6 +37,7 @@ class CashierHandler:
                 )
                 await self.redis_repo.set_status("running")
                 self.cashier_interval_seconds = event.cashier_interval_seconds
+                await self.redis_repo.set_worker_interval(worker_name="cashier", interval=event.cashier_interval_seconds)
                 self.remaining_time = self.cashier_interval_seconds
 
             elif routing_key == "simulation.paused":
@@ -57,6 +59,17 @@ class CashierHandler:
 
                 if self.work_task is None or self.work_task.done():
                     self.work_task = asyncio.create_task(self.work_loop())
+
+            elif routing_key == "simulation.updated":
+                event = SimulationUpdatedEvent.model_validate_json(message.body.decode())
+                worker_names = (worker_data.name for worker_data in event.workers)
+                if "cashier" not in worker_names:
+                    return
+                self.cashier_interval_seconds = next(
+                    worker_data.interval for worker_data in event.workers if worker_data.name == "cashier"
+                )
+                self.logger.info(f"Interval updated: {self.cashier_interval_seconds}")
+                await self.redis_repo.set_worker_interval(worker_name="cashier", interval=self.cashier_interval_seconds)
 
     async def start_or_resume_work(self):
         self.logger.info("Start or resume work")

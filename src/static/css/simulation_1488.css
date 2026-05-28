@@ -63,6 +63,25 @@ body {
         0 2px 0 rgba(255, 255, 255, 0.24) inset;
 }
 
+.floating-settings-panel {
+    position: absolute;
+    top: 96px;
+    left: 28px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 2px solid rgba(255, 255, 255, 0.74);
+    border-radius: 24px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08)),
+        var(--header-bg);
+    box-shadow:
+        0 14px 30px rgba(98, 51, 135, 0.24),
+        0 2px 0 rgba(255, 255, 255, 0.24) inset;
+}
+
 .control-button {
     border: 1px solid rgba(255, 255, 255, 0.58);
     border-radius: 18px;
@@ -462,10 +481,22 @@ body {
 
 @media (max-width: 800px) {
     .floating-controls {
+        top: 154px;
         right: 16px;
         left: 16px;
         flex-wrap: wrap;
         justify-content: center;
+    }
+
+    .floating-settings-panel {
+        top: 96px;
+        right: 16px;
+        left: 16px;
+        justify-content: center;
+    }
+
+    .floating-settings-panel .control-button {
+        width: 100%;
     }
 
     .timer-display {
@@ -474,7 +505,7 @@ body {
     }
 
     .page-content {
-        padding-top: 170px;
+        padding-top: 228px;
     }
 
     .worker-children {
@@ -506,13 +537,19 @@ body {
     }
 
     .floating-controls {
+        top: 140px;
+        right: 12px;
+        left: 12px;
+    }
+
+    .floating-settings-panel {
         top: 82px;
         right: 12px;
         left: 12px;
     }
 
     .page-content {
-        padding: 168px 18px 44px;
+        padding: 226px 18px 44px;
     }
 
     .worker-tree {

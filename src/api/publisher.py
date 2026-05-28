@@ -20,14 +20,13 @@ class ApiPublisher:
             durable=True
         )
 
-    async def publish(self, event_name: str, event: SimulationPausedEvent | SimulationStartedEvent | SimulationContinuedEvent):
+    async def publish(self, event_name: str, event: SimulationPausedEvent | SimulationStartedEvent | SimulationContinuedEvent | SimulationUpdatedEvent):
         await self.exchange.publish(
             aio_pika.Message(
                 event.model_dump_json().encode(),
             ),
             routing_key=event_name
         )
-
     async def close(self):
         if self.connection:
             await self.connection.close()

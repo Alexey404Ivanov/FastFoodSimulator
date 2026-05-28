@@ -101,6 +101,17 @@
             align-items: center;
         }
 
+        .field-control span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
         .field-control input,
         .field-control select {
             width: 100%;

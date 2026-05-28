@@ -1,8 +1,8 @@
 ﻿import json
-
+from datetime import UTC, datetime, timedelta
+from src.contracts.simulation import WorkerSchemaIntervalUpdate
 from src.infrastructure.redis.provider import RedisProvider
 
-from datetime import datetime, UTC, timedelta
 
 class SimulationStateRepository:
     STATUSES = {"running", "paused"}
@@ -12,11 +12,27 @@ class SimulationStateRepository:
     def __init__(self):
         self.redis = RedisProvider.get_client()
 
-    async def set_waiter_interval(self, waiter_interval: int):
-        await self.redis.set(f"simulation:{1488}:waiter_interval", waiter_interval)
+    async def set_worker_interval(self, worker_name: str, interval: int):
+        await self.redis.set(f"simulation:{1488}:{worker_name}_interval", interval)
+
+    # async def set_waiter_interval(self, waiter_interval: int):
+    #     await self.redis.set(f"simulation:{1488}:waiter_interval", waiter_interval)
+
+
+    async def get_workers_intervals(self):
+        workers_intervals = {}
+
+        for worker in ["client", "cashier", "kitchen", "waiter"]:
+            worker_interval = await self.redis.get(f"simulation:{1488}:{worker}_interval")
+            workers_intervals[f"{worker}_interval"] = worker_interval
+
+        return workers_intervals
+
+    async def update_workers_interval(self, request: list[WorkerSchemaIntervalUpdate]):
+        for worker_data in request:
+            await self.set_worker_interval(worker_data.name, worker_data.interval)
 
     async def get_state(self):
-        """Собираем полное состояние за один RTT через pipeline"""
         base_key = f"simulation:{1488}"
 
         # Запускаем все запросы параллельно
