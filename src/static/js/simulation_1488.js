@@ -5,6 +5,18 @@ const waiterProgressStorageKey = `simulation:${simulationId}:waiter-progress`
 
 const continueButton = document.getElementById("continueButton")
 const stopButton = document.getElementById("pauseButton")
+const simulationSettingsButton = document.getElementById("simulationSettingsButton")
+const simulationSettingsModal = document.getElementById("simulationSettingsModal")
+const simulationSettingsForm = document.getElementById("simulationSettingsForm")
+const simulationSettingsCloseButton = document.getElementById("simulationSettingsCloseButton")
+const simulationSettingsSubmitButton = document.getElementById("simulationSettingsSubmitButton")
+const simulationSettingsError = document.getElementById("simulationSettingsError")
+const intervalInputs = {
+  client: document.getElementById("clientIntervalInput"),
+  cashier: document.getElementById("cashierIntervalInput"),
+  kitchen: document.getElementById("kitchenIntervalInput"),
+  waiter: document.getElementById("waiterIntervalInput")
+}
 const timerDisplay = document.querySelector(".timer-display")
 const kitchenDoing = document.getElementById("kitchenDoing")
 const kitchenQueue = document.getElementById("kitchenQueue")
@@ -87,6 +99,37 @@ if (stopButton) {
   })
 }
 
+if (simulationSettingsButton) {
+  simulationSettingsButton.addEventListener("click", () => {
+    void openSimulationSettingsModal()
+  })
+}
+
+if (simulationSettingsCloseButton) {
+  simulationSettingsCloseButton.addEventListener("click", closeSimulationSettingsModal)
+}
+
+if (simulationSettingsModal) {
+  simulationSettingsModal.addEventListener("click", (event) => {
+    if (event.target === simulationSettingsModal) {
+      closeSimulationSettingsModal()
+    }
+  })
+}
+
+if (simulationSettingsForm) {
+  simulationSettingsForm.addEventListener("submit", (event) => {
+    event.preventDefault()
+    void submitSimulationSettings()
+  })
+}
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isSimulationSettingsModalOpen()) {
+    closeSimulationSettingsModal()
+  }
+})
+
 window.addEventListener("beforeunload", () => {
   if (state.status === "paused") {
     pauseWaiterTravel()
@@ -136,6 +179,133 @@ async function updateSimulationStatus(action) {
     }
   } catch (error) {
     console.error(`Failed to ${action} simulation:`, error)
+  }
+}
+
+async function openSimulationSettingsModal() {
+  if (!simulationSettingsModal) {
+    return
+  }
+
+  setSimulationSettingsError("")
+  setSimulationSettingsLoading(true, "Загрузка...")
+  simulationSettingsModal.hidden = false
+
+  try {
+    const response = await fetch("/api/simulation/settings")
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    const settings = await response.json()
+    fillSimulationSettingsForm(settings)
+  } catch (error) {
+    console.error("Failed to load simulation settings:", error)
+    setSimulationSettingsError("Не удалось загрузить текущие настройки")
+  } finally {
+    setSimulationSettingsLoading(false)
+    intervalInputs.client?.focus()
+  }
+}
+
+function closeSimulationSettingsModal() {
+  if (!simulationSettingsModal) {
+    return
+  }
+
+  simulationSettingsModal.hidden = true
+  setSimulationSettingsError("")
+}
+
+function isSimulationSettingsModalOpen() {
+  return Boolean(simulationSettingsModal && !simulationSettingsModal.hidden)
+}
+
+function fillSimulationSettingsForm(settings) {
+  setIntervalInputValue("client", settings?.client_interval)
+  setIntervalInputValue("cashier", settings?.cashier_interval)
+  setIntervalInputValue("kitchen", settings?.kitchen_interval)
+  setIntervalInputValue("waiter", settings?.waiter_interval)
+}
+
+function setIntervalInputValue(workerName, value) {
+  const input = intervalInputs[workerName]
+
+  if (!input) {
+    return
+  }
+
+  input.value = value ?? ""
+}
+
+async function submitSimulationSettings() {
+  if (!simulationSettingsForm) {
+    return
+  }
+
+  setSimulationSettingsError("")
+
+  if (!simulationSettingsForm.reportValidity()) {
+    return
+  }
+
+  const workers = Object.entries(intervalInputs).map(([name, input]) => ({
+    name,
+    interval: Number(input.value)
+  }))
+
+  if (workers.some((worker) => !Number.isFinite(worker.interval) || worker.interval <= 0)) {
+    setSimulationSettingsError("Интервалы должны быть положительными числами")
+    return
+  }
+
+  setSimulationSettingsLoading(true, "Сохранение...")
+
+  try {
+    const response = await fetch("/api/simulation/settings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ workers })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    const waiterSettings = workers.find((worker) => worker.name === "waiter")
+    state.waiter_interval = waiterSettings?.interval ?? state.waiter_interval
+    closeSimulationSettingsModal()
+  } catch (error) {
+    console.error("Failed to update simulation settings:", error)
+    setSimulationSettingsError("Не удалось сохранить настройки")
+  } finally {
+    setSimulationSettingsLoading(false)
+  }
+}
+
+function setSimulationSettingsLoading(isLoading, submitText = "Принять изменения") {
+  if (simulationSettingsButton) {
+    simulationSettingsButton.disabled = isLoading
+  }
+
+  if (simulationSettingsSubmitButton) {
+    simulationSettingsSubmitButton.disabled = isLoading
+    simulationSettingsSubmitButton.textContent = isLoading ? submitText : "Принять изменения"
+  }
+
+  Object.values(intervalInputs).forEach((input) => {
+    if (input) {
+      input.disabled = isLoading
+    }
+  })
+}
+
+function setSimulationSettingsError(message) {
+  if (simulationSettingsError) {
+    simulationSettingsError.textContent = message
   }
 }
 

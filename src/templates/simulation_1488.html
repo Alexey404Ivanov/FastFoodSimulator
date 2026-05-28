@@ -19,6 +19,38 @@
         <button id="simulationSettingsButton" class="control-button" type="button">Изменить настройки симуляции</button>
     </div>
 
+    <div id="simulationSettingsModal" class="settings-modal-overlay" hidden>
+        <form id="simulationSettingsForm" class="settings-modal" aria-labelledby="simulationSettingsTitle">
+            <button id="simulationSettingsCloseButton" class="settings-modal-close" type="button" aria-label="Закрыть окно настроек">&times;</button>
+            <h2 id="simulationSettingsTitle" class="settings-modal-title">Настройки симуляции</h2>
+
+            <div class="settings-modal-fields">
+                <label class="settings-field">
+                    <span>Интервал прибытия клиентов</span>
+                    <input id="clientIntervalInput" name="client" type="number" min="1" step="1" required>
+                </label>
+
+                <label class="settings-field">
+                    <span>Интервал оформления заказа</span>
+                    <input id="cashierIntervalInput" name="cashier" type="number" min="1" step="1" required>
+                </label>
+
+                <label class="settings-field">
+                    <span>Интервал готовки заказа</span>
+                    <input id="kitchenIntervalInput" name="kitchen" type="number" min="1" step="1" required>
+                </label>
+
+                <label class="settings-field">
+                    <span>Интервал выдачи заказа</span>
+                    <input id="waiterIntervalInput" name="waiter" type="number" min="1" step="1" required>
+                </label>
+            </div>
+
+            <div id="simulationSettingsError" class="settings-modal-error" role="alert" aria-live="polite"></div>
+            <button id="simulationSettingsSubmitButton" class="control-button settings-modal-submit" type="submit">Принять изменения</button>
+        </form>
+    </div>
+
     <header class="page-header">
     </header>
 
