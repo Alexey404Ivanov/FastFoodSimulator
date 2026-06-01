@@ -2,6 +2,10 @@ const simulationId = 1488
 const payloadStorageKey = `simulation:${simulationId}:payload`
 const sessionStartedKey = `simulation:${simulationId}:started`
 const waiterProgressStorageKey = `simulation:${simulationId}:waiter-progress`
+const workerProgressStorageKeys = {
+  cashier: `simulation:${simulationId}:cashier-progress`,
+  kitchen: `simulation:${simulationId}:kitchen-progress`
+}
 const settingsLastUpdatedStorageKey = `simulation:${simulationId}:settings-last-updated`
 const settingsUpdateCooldownMs = 15000
 const toastLifetimeMs = 3000
@@ -143,6 +147,8 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("beforeunload", () => {
   if (state.status === "paused") {
     pauseWaiterTravel()
+    pauseWorkerProgress("cashier")
+    pauseWorkerProgress("kitchen")
   }
 })
 
@@ -178,6 +184,37 @@ function handleEvent(msg) {
 }
 
 async function handleWorkerIntervalUpdated(data) {
+  const workerName = data?.worker_name
+  const newIntervalValue = data?.new_interval_value
+
+  switch (workerName) {
+    case "client":
+      setIntervalInputValue("client", newIntervalValue)
+      break
+
+    case "cashier":
+      state.cashier_interval = newIntervalValue
+      setIntervalInputValue("cashier", newIntervalValue)
+      renderCashier()
+      break
+
+    case "kitchen":
+      state.kitchen_interval = newIntervalValue
+      setIntervalInputValue("kitchen", newIntervalValue)
+      renderKitchen()
+      break
+
+    case "waiter":
+      state.waiter_interval = newIntervalValue
+      setIntervalInputValue("waiter", newIntervalValue)
+      if (state.waiter?.doing !== null && state.waiter?.doing !== undefined) {
+        renderWaiter()
+      }
+      break
+
+    default:
+      console.warn("Unknown worker interval updated event:", data)
+  }
 }
 
 
@@ -298,10 +335,13 @@ async function submitSimulationSettings() {
       throw new Error(`Request failed with status ${response.status}`)
     }
 
-    const waiterSettings = workers.find((worker) => worker.name === "waiter")
-    state.waiter_interval = waiterSettings?.interval ?? state.waiter_interval
+    workers.forEach((worker) => {
+      updateWorkerIntervalState(worker.name, worker.interval)
+    })
     persistSettingsLastUpdatedAt(Date.now())
     closeSimulationSettingsModal()
+    renderCashier()
+    renderKitchen()
   } catch (error) {
     console.error("Failed to update simulation settings:", error)
     setSimulationSettingsError("Не удалось сохранить настройки")
@@ -440,23 +480,32 @@ function handleWorkerStartedJob(data) {
       break
 
     default:
-      console.warn("Unknown event:", msg)
+      console.warn("Unknown worker started job event:", data)
   }
 }
 
-function handleCashierStartedJob() {
+function handleCashierStartedJob(started_at) {
   const nextClientId = state.cashier.queue.shift()
+
+  if (!hasEntity(nextClientId)) {
+    return
+  }
+
+  clearSavedWorkerProgress("cashier")
   state.cashier.doing = nextClientId
+  state.cashier_started_work_at = started_at ?? state.cashier_started_work_at
   animateCashierStartedJob(nextClientId)
 }
 
-function handleKitchenStartedJob() {
+function handleKitchenStartedJob(started_at) {
   if (!Array.isArray(state.kitchen.queue) || !state.kitchen.queue.length) {
     return
   }
 
   const nextTicketId = state.kitchen.queue.shift()
+  clearSavedWorkerProgress("kitchen")
   state.kitchen.doing = nextTicketId
+  state.kitchen_started_work_at = started_at ?? state.kitchen_started_work_at
   animateKitchenStartedJob(nextTicketId)
 }
 
@@ -491,7 +540,7 @@ function handleWorkerFinishedJob(data) {
       break
 
     default:
-      console.warn("Unknown event:", msg)
+      console.warn("Unknown worker finished job event:", data)
   }
 }
 
@@ -503,6 +552,8 @@ function handleCashierFinishedJob() {
   }
 
   state.cashier.doing = null
+  state.cashier_started_work_at = null
+  clearSavedWorkerProgress("cashier")
   animateClientDoneWithCashier(finishedClientId)
 }
 
@@ -514,6 +565,8 @@ function handleKitchenFinishedJob() {
   }
 
   state.kitchen.doing = null
+  state.kitchen_started_work_at = null
+  clearSavedWorkerProgress("kitchen")
   renderKitchen()
 }
 
@@ -547,7 +600,11 @@ function handleInit(msg) {
       doing: msg.data?.waiter?.doing ?? null,
       queue: msg.data?.waiter?.queue ?? []
     },
+    cashier_started_work_at: msg.data?.cashier_started_work_at ?? null,
+    kitchen_started_work_at: msg.data?.kitchen_started_work_at ?? null,
     waiter_started_work_at: msg.data?.waiter_started_work_at ?? null,
+    cashier_interval: msg.data?.cashier_interval ?? null,
+    kitchen_interval: msg.data?.kitchen_interval ?? null,
     waiter_interval: msg.data?.waiter_interval ?? null,
     worked_time: msg.data?.worked_time ?? null,
     started_at: msg.data?.started_at ?? null
@@ -563,11 +620,11 @@ function handleInit(msg) {
     state.status === "running" &&
     state.waiter?.doing !== null &&
     state.waiter?.doing !== undefined &&
-    state.waiter_started_work_time
+    state.waiter_started_work_at
   ) {
     animateWaiterGoToClient(
       state.waiter.doing,
-      getSavedWaiterProgress(state.waiter.doing) ?? getWaiterProgressMs(state.waiter_started_work_time)
+      getSavedWaiterProgress(state.waiter.doing) ?? getWaiterProgressMs(state.waiter_started_work_at)
     )
   }
 }
@@ -581,6 +638,9 @@ function handleStatusUpdated(msg) {
   renderStatus()
   syncTimerState()
   syncWaiterTravelStatus(previousStatus, nextStatus)
+  syncWorkerProgressStatus(previousStatus, nextStatus)
+  renderCashier()
+  renderKitchen()
 }
 
 function renderAll() {
@@ -691,6 +751,59 @@ function syncWaiterTravelStatus(previousStatus, nextStatus) {
   if (nextStatus === "running") {
     resumeWaiterTravel()
   }
+}
+
+function syncWorkerProgressStatus(previousStatus, nextStatus) {
+  if (previousStatus === nextStatus) {
+    return
+  }
+
+  if (nextStatus === "paused") {
+    pauseWorkerProgress("cashier")
+    pauseWorkerProgress("kitchen")
+    return
+  }
+
+  if (nextStatus === "running") {
+    resumeWorkerProgress("cashier")
+    resumeWorkerProgress("kitchen")
+  }
+}
+
+function pauseWorkerProgress(workerName) {
+  const entityId = getWorkerDoingEntityId(workerName)
+
+  if (!hasEntity(entityId)) {
+    clearSavedWorkerProgress(workerName)
+    return
+  }
+
+  const intervalMs = getWorkerIntervalMs(workerName)
+  const savedProgress = getSavedWorkerProgress(workerName, entityId)
+  const currentProgress = savedProgress ?? getWorkerProgressMs(state[`${workerName}_started_work_at`])
+  const clampedProgress = Math.max(0, Math.min(currentProgress, intervalMs))
+
+  persistWorkerProgress(workerName, entityId, clampedProgress)
+}
+
+function resumeWorkerProgress(workerName) {
+  const entityId = getWorkerDoingEntityId(workerName)
+
+  if (!hasEntity(entityId)) {
+    clearSavedWorkerProgress(workerName)
+    return
+  }
+
+  const savedProgress = getSavedWorkerProgress(workerName, entityId)
+
+  if (savedProgress === null) {
+    return
+  }
+
+  const intervalMs = getWorkerIntervalMs(workerName)
+  const clampedProgress = Math.max(0, Math.min(savedProgress, intervalMs))
+  state[`${workerName}_started_work_at`] = new Date(Date.now() - clampedProgress).toISOString()
+  clearSavedWorkerProgress(workerName)
 }
 
 function restoreWaiterTravelState() {
@@ -880,8 +993,8 @@ function renderPausedWaiterTravel(entity_id, progress = 0) {
 }
 
 function renderCashier() {
-  cashierCurrentClient.innerHTML = state.cashier.doing
-    ? createClientCard(state.cashier.doing)
+  cashierCurrentClient.innerHTML = hasEntity(state.cashier.doing)
+    ? createClientCard(state.cashier.doing, { progress: getWorkerProgressState("cashier") })
     : '<div class="client-card-empty">Нет текущего клиента</div>'
 
   if (!state.cashier.queue.length) {
@@ -895,8 +1008,8 @@ function renderCashier() {
 }
 
 function renderKitchen() {
-  kitchenDoing.innerHTML = state.kitchen?.doing
-    ? createTicketCard(state.kitchen.doing)
+  kitchenDoing.innerHTML = hasEntity(state.kitchen?.doing)
+    ? createTicketCard(state.kitchen.doing, { progress: getWorkerProgressState("kitchen") })
     : '<div class="ticket-card-empty">Нет текущего заказа</div>'
 
   if (!state.kitchen?.queue?.length) {
@@ -912,7 +1025,7 @@ function renderKitchen() {
 function renderWaiter() {
   const currentWaiterClientId = getWaiterVisibleClientId()
 
-  waiterCurrentClient.innerHTML = currentWaiterClientId
+  waiterCurrentClient.innerHTML = hasEntity(currentWaiterClientId)
     ? createClientCard(currentWaiterClientId)
     : '<div class="client-card-empty">Нет текущего клиента</div>'
 
@@ -941,18 +1054,20 @@ function renderWaiterClientQueue() {
     .join("")
 }
 
-function createClientCard(clientId) {
+function createClientCard(clientId, options = {}) {
   return `
     <div class="client-card">
+      ${createWorkerProgressBar(options.progress)}
       <div class="client-card-number">#${clientId}</div>
       <img src="../static/images/client.svg" alt="Client #${clientId}">
     </div>
   `
 }
 
-function createTicketCard(ticketId) {
+function createTicketCard(ticketId, options = {}) {
   return `
     <div class="ticket-card">
+      ${createWorkerProgressBar(options.progress)}
       <div class="ticket-card-number">#${ticketId}</div>
       <img src="../static/images/ticket.svg" alt="Ticket #${ticketId}">
     </div>
@@ -1099,6 +1214,7 @@ function animateClientDoneWithCashier(entity_id) {
   const startPoint = getDocumentPoint(startRect)
 
   const travelCard = startCard.cloneNode(true)
+  removeWorkerProgressBar(travelCard)
   travelCard.classList.remove("client-card-arriving")
   travelCard.classList.add("client-card-travel")
   travelCard.style.position = "absolute"
@@ -1278,6 +1394,8 @@ function animateOrderDone(entity_id) {
     renderWaiter()
     return entity_id
   }
+
+  removeWorkerProgressBar(travelCard)
 
   const startRect = kitchenWorkerImage.getBoundingClientRect()
   const targetRect = getWaiterBurgerQueueTargetRect()
@@ -1651,6 +1769,162 @@ function getWaiterIntervalMs() {
 }
 
 function getWaiterProgressMs(startedAtStr) {
+  const startedAtMs = Date.parse(startedAtStr)
+
+  if (Number.isNaN(startedAtMs)) {
+    return 0
+  }
+
+  return Math.max(0, Date.now() - startedAtMs)
+}
+
+function hasEntity(entityId) {
+  return entityId !== null && entityId !== undefined
+}
+
+function updateWorkerIntervalState(workerName, interval) {
+
+  switch (workerName) {
+    case "cashier":
+      state.cashier_interval = interval
+      break
+
+    case "kitchen":
+      state.kitchen_interval = interval
+      break
+
+    case "waiter":
+      state.waiter_interval = interval
+      break
+
+    default:
+      console.warn("Unknown worker interval:", workerName)
+  }
+}
+
+function getWorkerProgressState(workerName) {
+  const intervalMs = getWorkerIntervalMs(workerName)
+  const startedAt = state[`${workerName}_started_work_at`]
+  const entityId = getWorkerDoingEntityId(workerName)
+  const savedProgress = state.status === "paused"
+    ? getSavedWorkerProgress(workerName, entityId)
+    : null
+  const progressMs = savedProgress ?? getWorkerProgressMs(startedAt)
+  const clampedProgressMs = Math.max(0, Math.min(progressMs, intervalMs))
+  const progressRatio = intervalMs > 0 ? clampedProgressMs / intervalMs : 1
+
+  return {
+    progressRatio,
+    remainingMs: Math.max(0, intervalMs - clampedProgressMs),
+    isRunning: state.status === "running"
+  }
+}
+
+function createWorkerProgressBar(progress) {
+  if (!progress) {
+    return ""
+  }
+
+  const progressRatio = Math.max(0, Math.min(1, progress.progressRatio))
+  const remainingMs = Math.max(0, Number(progress.remainingMs) || 0)
+  const runningClass = progress.isRunning && remainingMs > 0
+    ? " worker-progress-fill-running"
+    : ""
+
+  return `
+      <div class="worker-progress-pipe" aria-hidden="true">
+        <div
+          class="worker-progress-fill${runningClass}"
+          style="--worker-progress-start: ${progressRatio}; --worker-progress-remaining: ${remainingMs}ms;"
+        ></div>
+      </div>`
+}
+
+function removeWorkerProgressBar(card) {
+  card.querySelector(".worker-progress-pipe")?.remove()
+}
+
+function getWorkerDoingEntityId(workerName) {
+  return state[workerName]?.doing
+}
+
+function persistWorkerProgress(workerName, entityId, progressMs) {
+  const storageKey = workerProgressStorageKeys[workerName]
+
+  if (!storageKey || !hasEntity(entityId)) {
+    clearSavedWorkerProgress(workerName)
+    return
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      workerName,
+      entityId,
+      progressMs: Math.max(0, progressMs)
+    }))
+  } catch (error) {
+    console.warn(`Failed to persist ${workerName} progress:`, error)
+  }
+}
+
+function getSavedWorkerProgress(workerName, entityId) {
+  const storageKey = workerProgressStorageKeys[workerName]
+
+  if (!storageKey || !hasEntity(entityId)) {
+    return null
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(storageKey)
+
+    if (!rawValue) {
+      return null
+    }
+
+    const parsedValue = JSON.parse(rawValue)
+
+    if (parsedValue?.workerName !== workerName || parsedValue?.entityId !== entityId) {
+      return null
+    }
+
+    const progressMs = Number(parsedValue.progressMs)
+
+    if (!Number.isFinite(progressMs) || progressMs < 0) {
+      return null
+    }
+
+    return progressMs
+  } catch (error) {
+    console.warn(`Failed to read ${workerName} progress:`, error)
+    return null
+  }
+}
+
+function clearSavedWorkerProgress(workerName) {
+  const storageKey = workerProgressStorageKeys[workerName]
+
+  if (!storageKey) {
+    return
+  }
+
+  try {
+    window.localStorage.removeItem(storageKey)
+  } catch (error) {
+    console.warn(`Failed to clear ${workerName} progress:`, error)
+  }
+}
+
+function getWorkerIntervalMs(workerName) {
+  const rawValue = Number(state[`${workerName}_interval`])
+
+  if (!Number.isFinite(rawValue) || rawValue <= 0) {
+    return 3000
+  }
+
+  return rawValue < 1000 ? rawValue * 1000 : rawValue
+}
+
+function getWorkerProgressMs(startedAtStr) {
   const startedAtMs = Date.parse(startedAtStr)
 
   if (Number.isNaN(startedAtMs)) {
