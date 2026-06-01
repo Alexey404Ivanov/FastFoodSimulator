@@ -37,7 +37,7 @@ class SimulationStateLifecycle:
             f"{base_key}:waiter_started_work_at",
             f"{base_key}:client_interval",
             f"{base_key}:cashier_interval",
-            f"{base_key}:kitchen_interval"
+            f"{base_key}:kitchen_interval",
             f"{base_key}:waiter_interval",
         ]
         for key in keys_to_delete:

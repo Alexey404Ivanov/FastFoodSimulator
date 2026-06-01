@@ -51,8 +51,8 @@ class WaiterHandler:
             elif routing_key == "order.done":
                 event = OrderDoneEvent.model_validate_json(message.body.decode())
 
-                await self.orders_to_deliver_queue.put(event.order_id)
                 await self.redis_repo.push_to_worker_queue(worker_name="waiter", entity_id=event.order_id)
+                await self.orders_to_deliver_queue.put(event.order_id)
 
                 self.logger.info(f"Client #{event.order_id} put to queue")
 

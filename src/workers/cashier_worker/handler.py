@@ -52,8 +52,8 @@ class CashierHandler:
             elif routing_key == "client.arrived":
                 event = ClientArrivedEvent.model_validate_json(message.body.decode())
 
-                await self.client_queue.put(event.client_id)
                 await self.redis_repo.push_to_worker_queue(worker_name="cashier", entity_id=event.client_id)
+                await self.client_queue.put(event.client_id)
 
                 self.logger.info(f"Client #{event.client_id} put in queue")
 

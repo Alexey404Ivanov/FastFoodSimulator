@@ -49,8 +49,8 @@ class KitchenWorker:
             elif routing_key == "order.created":
                 event = OrderCreatedEvent.model_validate_json(message.body.decode())
 
-                await self.order_queue.put(event.order_id)
                 await self.redis_repo.push_to_worker_queue(worker_name="kitchen", entity_id=event.order_id)
+                await self.order_queue.put(event.order_id)
 
                 self.logger.info(f"Order #{event.order_id} put in queue")
 
