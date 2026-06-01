@@ -145,11 +145,7 @@ window.addEventListener("keydown", (event) => {
 })
 
 window.addEventListener("beforeunload", () => {
-  if (state.status === "paused") {
-    pauseWaiterTravel()
-    pauseWorkerProgress("cashier")
-    pauseWorkerProgress("kitchen")
-  }
+  persistActiveProgressBeforeUnload()
 })
 
 function handleEvent(msg) {
@@ -610,6 +606,7 @@ function handleInit(msg) {
     started_at: msg.data?.started_at ?? null
   }
   waiterClientQueueState = buildWaiterClientQueueStateFromState()
+  restoreWorkerProgressState()
   console.log(state)
 
   renderAll()
@@ -767,6 +764,35 @@ function syncWorkerProgressStatus(previousStatus, nextStatus) {
   if (nextStatus === "running") {
     resumeWorkerProgress("cashier")
     resumeWorkerProgress("kitchen")
+  }
+}
+
+function persistActiveProgressBeforeUnload() {
+  pauseWaiterTravel()
+  pauseWorkerProgress("cashier")
+  pauseWorkerProgress("kitchen")
+}
+
+function restoreWorkerProgressState() {
+  restoreWorkerProgress("cashier")
+  restoreWorkerProgress("kitchen")
+}
+
+function restoreWorkerProgress(workerName) {
+  const entityId = getWorkerDoingEntityId(workerName)
+
+  if (!hasEntity(entityId)) {
+    clearSavedWorkerProgress(workerName)
+    return
+  }
+
+  if (state.status === "running") {
+    resumeWorkerProgress(workerName)
+    return
+  }
+
+  if (state.status === "paused" && getSavedWorkerProgress(workerName, entityId) === null) {
+    clearSavedWorkerProgress(workerName)
   }
 }
 
