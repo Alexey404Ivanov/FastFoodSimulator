@@ -2,6 +2,9 @@ const simulationId = 1488
 const payloadStorageKey = `simulation:${simulationId}:payload`
 const sessionStartedKey = `simulation:${simulationId}:started`
 const waiterProgressStorageKey = `simulation:${simulationId}:waiter-progress`
+const settingsLastUpdatedStorageKey = `simulation:${simulationId}:settings-last-updated`
+const settingsUpdateCooldownMs = 15000
+const toastLifetimeMs = 3000
 
 const continueButton = document.getElementById("continueButton")
 const stopButton = document.getElementById("pauseButton")
@@ -17,6 +20,7 @@ const intervalInputs = {
   kitchen: document.getElementById("kitchenIntervalInput"),
   waiter: document.getElementById("waiterIntervalInput")
 }
+const toastStack = document.getElementById("toastStack")
 const timerDisplay = document.querySelector(".timer-display")
 const kitchenDoing = document.getElementById("kitchenDoing")
 const kitchenQueue = document.getElementById("kitchenQueue")
@@ -187,6 +191,11 @@ async function openSimulationSettingsModal() {
     return
   }
 
+  if (isSettingsUpdateCooldownActive()) {
+    showToast("Обновлять настройки можно раз в 15 секунд")
+    return
+  }
+
   setSimulationSettingsError("")
   setSimulationSettingsLoading(true, "Загрузка...")
   simulationSettingsModal.hidden = false
@@ -277,6 +286,7 @@ async function submitSimulationSettings() {
 
     const waiterSettings = workers.find((worker) => worker.name === "waiter")
     state.waiter_interval = waiterSettings?.interval ?? state.waiter_interval
+    persistSettingsLastUpdatedAt(Date.now())
     closeSimulationSettingsModal()
   } catch (error) {
     console.error("Failed to update simulation settings:", error)
@@ -307,6 +317,59 @@ function setSimulationSettingsError(message) {
   if (simulationSettingsError) {
     simulationSettingsError.textContent = message
   }
+}
+
+function isSettingsUpdateCooldownActive() {
+  const lastUpdatedAt = getSettingsLastUpdatedAt()
+
+  if (lastUpdatedAt === null) {
+    return false
+  }
+
+  return Date.now() - lastUpdatedAt <= settingsUpdateCooldownMs
+}
+
+function getSettingsLastUpdatedAt() {
+  try {
+    const rawValue = window.localStorage.getItem(settingsLastUpdatedStorageKey)
+    const parsedValue = Number(rawValue)
+
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      return null
+    }
+
+    return parsedValue
+  } catch (error) {
+    console.warn("Failed to read settings cooldown:", error)
+    return null
+  }
+}
+
+function persistSettingsLastUpdatedAt(updatedAt) {
+  try {
+    window.localStorage.setItem(settingsLastUpdatedStorageKey, String(updatedAt))
+  } catch (error) {
+    console.warn("Failed to persist settings cooldown:", error)
+  }
+}
+
+function showToast(message) {
+  if (!toastStack) {
+    return
+  }
+
+  const toast = document.createElement("div")
+  toast.className = "toast-notification"
+  toast.textContent = message
+  toastStack.appendChild(toast)
+
+  window.setTimeout(() => {
+    toast.classList.add("toast-notification-removing")
+
+    window.setTimeout(() => {
+      toast.remove()
+    }, 240)
+  }, toastLifetimeMs)
 }
 
 function handleWorkerQueuePushed(data) {
