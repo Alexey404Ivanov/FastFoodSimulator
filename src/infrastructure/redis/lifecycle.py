@@ -7,16 +7,21 @@ class SimulationStateLifecycle:
         redis = RedisProvider.get_client()
         pipe = redis.pipeline()
         base_key = f"simulation:{simulation_id}"
+
         pipe.hset(base_key, "status", "paused")
+        pipe.hset(base_key, "worked_time", "0")
 
         pipe.hset(f"{base_key}:cashier", "doing", "")
-
         pipe.hset(f"{base_key}:kitchen", "doing", "")
-
         pipe.hset(f"{base_key}:waiter", "doing", "")
+
+        pipe.set(f"{base_key}:cashier_started_work_at", "")
+        pipe.set(f"{base_key}:kitchen_started_work_at", "")
         pipe.set(f"{base_key}:waiter_started_work_at", "")
+
+        pipe.set(f"{base_key}:cashier_interval", "")
+        pipe.set(f"{base_key}:kitchen_interval", "")
         pipe.set(f"{base_key}:waiter_interval", "")
-        pipe.hset(base_key, "worked_time", "0")
 
         await pipe.execute()
 
@@ -34,6 +39,8 @@ class SimulationStateLifecycle:
             f"{base_key}:kitchen:queue",
             f"{base_key}:waiter",
             f"{base_key}:waiter:queue",
+            f"{base_key}:cashier_started_work_at",
+            f"{base_key}:kitchen_started_work_at",
             f"{base_key}:waiter_started_work_at",
             f"{base_key}:client_interval",
             f"{base_key}:cashier_interval",

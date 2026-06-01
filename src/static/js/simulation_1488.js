@@ -65,8 +65,14 @@ let state = {
     doing: null,
     queue: []
   },
-  waiter_started_work_time: null,
+  cashier_started_work_at: null,
+  kitchen_started_work_at: null,
+  waiter_started_work_at: null,
+
+  cashier_interval: null,
+  kitchen_interval: null,
   waiter_interval: null,
+
   worked_time: null,
   started_at: null
 }
@@ -162,10 +168,18 @@ function handleEvent(msg) {
       handleWorkerFinishedJob(msg.data)
       break
 
+    case "worker_interval_updated":
+      handleWorkerIntervalUpdated(msg.data)
+      break
+
     default:
       console.warn("Unknown event:", msg)
   }
 }
+
+async function handleWorkerIntervalUpdated(data) {
+}
+
 
 async function updateSimulationStatus(action) {
   const endpoint = `/api/simulation/${action}`
@@ -414,15 +428,15 @@ function handleWaiterQueuePushed(entity_id) {
 function handleWorkerStartedJob(data) {
   switch (data.worker_name) {
     case "cashier":
-      handleCashierStartedJob()
+      handleCashierStartedJob(data.started_work_at)
       break
 
     case "kitchen":
-      handleKitchenStartedJob()
+      handleKitchenStartedJob(data.started_work_at)
       break
 
     case "waiter":
-      handleWaiterStartedJob(data.waiter_started_work_at)
+      handleWaiterStartedJob(data.started_work_at)
       break
 
     default:
@@ -454,10 +468,10 @@ function handleWaiterStartedJob(started_at) {
   }
 
   state.waiter.doing = nextOrderId
-  state.waiter_started_work_time = started_at ?? state.waiter_started_work_time
+  state.waiter_started_work_at = started_at ?? state.waiter_started_work_at
 
   const savedProgress = getSavedWaiterProgress(nextOrderId)
-  const progress = savedProgress ?? getWaiterProgressMs(state.waiter_started_work_time)
+  const progress = savedProgress ?? getWaiterProgressMs(state.waiter_started_work_at)
   renderWaiter()
   animateWaiterGoToClient(nextOrderId, progress)
 }
@@ -513,7 +527,7 @@ function handleWaiterFinishedJob() {
   clearWaiterTravelState()
   clearSavedWaiterProgress()
   state.waiter.doing = null
-  state.waiter_started_work_time = null
+  state.waiter_started_work_at = null
   setWaiterWorkerImage(false)
   renderWaiter()
 }
@@ -533,7 +547,7 @@ function handleInit(msg) {
       doing: msg.data?.waiter?.doing ?? null,
       queue: msg.data?.waiter?.queue ?? []
     },
-    waiter_started_work_time: msg.data?.waiter_started_work_time ?? null,
+    waiter_started_work_at: msg.data?.waiter_started_work_at ?? null,
     waiter_interval: msg.data?.waiter_interval ?? null,
     worked_time: msg.data?.worked_time ?? null,
     started_at: msg.data?.started_at ?? null
@@ -703,7 +717,7 @@ function pauseWaiterTravel() {
     const currentOrderId = state.waiter?.doing
 
     if (currentOrderId !== null && currentOrderId !== undefined) {
-      const fallbackProgress = getSavedWaiterProgress(currentOrderId) ?? getWaiterProgressMs(state.waiter_started_work_time)
+      const fallbackProgress = getSavedWaiterProgress(currentOrderId) ?? getWaiterProgressMs(state.waiter_started_work_at)
       renderPausedWaiterTravel(currentOrderId, fallbackProgress)
     }
 

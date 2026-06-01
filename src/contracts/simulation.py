@@ -22,9 +22,9 @@ class OrderCreatedEvent(BaseModel):
 class OrderDoneEvent(BaseModel):
     order_id: int
 
-class WorkerSchemaIntervalUpdate(BaseModel):
+class WorkerIntervalUpdateSchema(BaseModel):
     name: str
     interval: int
 
 class SimulationUpdatedEvent(BaseModel):
-    workers: list[WorkerSchemaIntervalUpdate]
+    workers: list[WorkerIntervalUpdateSchema]
