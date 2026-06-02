@@ -588,6 +588,7 @@ function handleWaiterFinishedJob() {
   state.waiter_started_work_at = null
   setWaiterWorkerImage(false)
   renderWaiter()
+  showToast(`Клиент #${finishedOrderId} ушел к обеденной зоне`)
 }
 
 function handleInit(msg) {
@@ -1780,17 +1781,28 @@ function buildWaiterClientQueueStateFromState() {
     waitingClientIds.push(clientId)
   }
 
-  enqueueClientId(state.kitchen?.doing)
+  if (Array.isArray(state.waiter?.queue)) {
+    state.waiter.queue.forEach(enqueueClientId)
+  }
 
   if (Array.isArray(state.kitchen?.queue)) {
     state.kitchen.queue.forEach(enqueueClientId)
   }
 
-  if (Array.isArray(state.waiter?.queue)) {
-    state.waiter.queue.forEach(enqueueClientId)
+  enqueueClientId(state.kitchen?.doing)
+
+  return waitingClientIds.sort(compareEntityIdsAscending)
+}
+
+function compareEntityIdsAscending(leftId, rightId) {
+  const leftNumber = Number(leftId)
+  const rightNumber = Number(rightId)
+
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber
   }
 
-  return waitingClientIds
+  return String(leftId).localeCompare(String(rightId), "ru", { numeric: true })
 }
 
 function getWaiterIntervalMs() {
