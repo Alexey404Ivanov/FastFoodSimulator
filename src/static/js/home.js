@@ -1,7 +1,12 @@
-﻿const simulationForm = document.getElementById("simulationForm");
+const simulationForm = document.getElementById("simulationForm");
+const simulationFormError = document.getElementById("simulationFormError");
+const intervalMinSeconds = 5;
+const intervalMaxSeconds = 45;
+const intervalRangeErrorMessage = "Только значения от 5 до 45 включительно";
 
 simulationForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    setSimulationFormError("");
 
     const formData = new FormData(simulationForm);
     const values = Object.fromEntries(formData.entries());
@@ -13,6 +18,23 @@ simulationForm.addEventListener("submit", async (event) => {
         kitchen_interval_seconds: Number(values.kitchen_interval_seconds),
         waiter_interval_seconds: Number(values.waiter_interval_seconds),
     };
+
+    const intervals = Object.values(payload);
+
+    if (
+        intervals.some((interval) => (
+            !Number.isFinite(interval) ||
+            interval < intervalMinSeconds ||
+            interval > intervalMaxSeconds
+        ))
+    ) {
+        setSimulationFormError(intervalRangeErrorMessage);
+        return;
+    }
+
+    if (!simulationForm.reportValidity()) {
+        return;
+    }
 
     console.log("Sending payload:", payload);
 
@@ -39,3 +61,9 @@ simulationForm.addEventListener("submit", async (event) => {
 
     window.location.href="/simulation/1488"
 });
+
+function setSimulationFormError(message) {
+    if (simulationFormError) {
+        simulationFormError.textContent = message;
+    }
+}

@@ -160,6 +160,13 @@
             transform: translateY(-1px);
         }
 
+        .simulation-form-error {
+            min-height: 20px;
+            color: #ff2f2f;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
         .submit-button {
             margin-top: 8px;
             border: none;

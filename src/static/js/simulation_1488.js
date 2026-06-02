@@ -9,6 +9,9 @@ const workerProgressStorageKeys = {
 const settingsLastUpdatedStorageKey = `simulation:${simulationId}:settings-last-updated`
 const settingsUpdateCooldownMs = 15000
 const toastLifetimeMs = 3000
+const intervalMinSeconds = 5
+const intervalMaxSeconds = 45
+const intervalRangeErrorMessage = "Только значения от 5 до 45 включительно"
 
 const continueButton = document.getElementById("continueButton")
 const stopButton = document.getElementById("pauseButton")
@@ -302,17 +305,23 @@ async function submitSimulationSettings() {
 
   setSimulationSettingsError("")
 
-  if (!simulationSettingsForm.reportValidity()) {
-    return
-  }
-
   const workers = Object.entries(intervalInputs).map(([name, input]) => ({
     name,
     interval: Number(input.value)
   }))
 
-  if (workers.some((worker) => !Number.isFinite(worker.interval) || worker.interval <= 0)) {
-    setSimulationSettingsError("Интервалы должны быть положительными числами")
+  if (
+    workers.some((worker) => (
+      !Number.isFinite(worker.interval) ||
+      worker.interval < intervalMinSeconds ||
+      worker.interval > intervalMaxSeconds
+    ))
+  ) {
+    setSimulationSettingsError(intervalRangeErrorMessage)
+    return
+  }
+
+  if (!simulationSettingsForm.reportValidity()) {
     return
   }
 
@@ -346,14 +355,14 @@ async function submitSimulationSettings() {
   }
 }
 
-function setSimulationSettingsLoading(isLoading, submitText = "Принять изменения") {
+function setSimulationSettingsLoading(isLoading, submitText = "Применить изменения") {
   if (simulationSettingsButton) {
     simulationSettingsButton.disabled = isLoading
   }
 
   if (simulationSettingsSubmitButton) {
     simulationSettingsSubmitButton.disabled = isLoading
-    simulationSettingsSubmitButton.textContent = isLoading ? submitText : "Принять изменения"
+    simulationSettingsSubmitButton.textContent = isLoading ? submitText : "Применить изменения"
   }
 
   Object.values(intervalInputs).forEach((input) => {
