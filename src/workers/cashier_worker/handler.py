@@ -5,7 +5,7 @@ from time import monotonic
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
-from src.contracts.simulation import (
+from src.events.simulation import (
     ClientArrivedEvent,
     OrderCreatedEvent,
     SimulationPausedEvent,

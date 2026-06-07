@@ -1,6 +1,6 @@
 ﻿import json
 from datetime import UTC, datetime, timedelta
-from src.contracts.simulation import WorkerIntervalUpdateSchema
+from src.events.simulation import WorkerIntervalUpdateSchema
 from src.infrastructure.redis.provider import RedisProvider
 
 

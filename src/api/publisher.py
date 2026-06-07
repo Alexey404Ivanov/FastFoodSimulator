@@ -2,7 +2,7 @@
 from aio_pika import ExchangeType
 from aio_pika.abc import AbstractRobustExchange
 
-from src.contracts.simulation import *
+from src.events.simulation import *
 
 
 class ApiPublisher:

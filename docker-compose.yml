@@ -1,16 +1,25 @@
 ﻿services:
   api:
     build: .
+    container_name: ffs_api
     ports:
      - "8080:8080"
     env_file:
       - .env
 
-  client-generator:
-    build: .
+
+  postgres:
+    image: postgres:16
+    container_name: ffs_postgres
+    environment:
+      POSTGRES_DB: FFSDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
     ports:
-      - "5672:5672"
-    command: uv run python -m src.workers.client_generator_worker
-    env_file:
-      - .env
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
+
 

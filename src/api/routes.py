@@ -3,15 +3,34 @@ import json
 
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
+from typing import Annotated
+from fastapi import Depends
 
-from src.api.dependencies import publisher
-from src.contracts.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
+from src.api.dependencies import publisher, get_user_service
+from src.events.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
 from src.infrastructure.redis.provider import RedisProvider
 from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+
+from src.schemas.user_schemas import UserAddSchema
+
+from src.services.users_service import UsersService
 
 templates = Jinja2Templates(directory="src/templates")
 
 router = APIRouter()
+
+# user_service = Annotated[
+#     UsersService,
+#     Depends(get_user_service)
+# ]
+
+@router.post("/users")
+async def create_user(
+    user: UserAddSchema,
+    user_service: Annotated[UsersService, Depends(get_user_service)]
+):
+    response = await user_service.add_user(user)
+    return response
 
 @router.get("/")
 async def home(request: Request):

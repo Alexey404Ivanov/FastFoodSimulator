@@ -2,10 +2,10 @@
 
 import uvicorn
 
-from src.settings.api_settings import APISettings
+from src.config.project_config import get_settings
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    api_settings = APISettings()
-    uvicorn.run("src.api.main:app", reload=False, host=api_settings.host, port=api_settings.port)
+    settings = get_settings()
+    uvicorn.run("src.api.main:app", reload=False, host=settings.API_HOST, port=settings.API_PORT)
 
