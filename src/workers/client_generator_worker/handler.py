@@ -5,7 +5,7 @@ from time import monotonic
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+from repositories.redis.simulation_state_repository import SimulationStateRepository
 from src.events.simulation import ClientArrivedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
 
 class ClientGeneratorHandler:

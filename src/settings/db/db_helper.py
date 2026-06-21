@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import (
     async_scoped_session
 )
 
-from src.config.db.db_config import get_postgres_config
+from src.settings.db.db_settings import get_postgres_config
 
 
-class DatabaseHelper:
+class DBHelper:
     def __init__(self, url: str):
         self.engine = create_async_engine(url)
 
@@ -36,5 +36,5 @@ class DatabaseHelper:
         finally:
             await session.close()
 
-db_helper = DatabaseHelper(get_postgres_config().database_url)
+db_helper = DBHelper(get_postgres_config().database_url)
 

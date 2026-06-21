@@ -1,4 +1,4 @@
-﻿from src.infrastructure.redis.provider import RedisProvider
+﻿from repositories.redis.provider import RedisProvider
 
 
 class SimulationStateLifecycle:

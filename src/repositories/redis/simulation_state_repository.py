@@ -1,7 +1,7 @@
 ﻿import json
 from datetime import UTC, datetime, timedelta
 from src.events.simulation import WorkerIntervalUpdateSchema
-from src.infrastructure.redis.provider import RedisProvider
+from src.repositories.redis.provider import RedisProvider
 
 
 class SimulationStateRepository:

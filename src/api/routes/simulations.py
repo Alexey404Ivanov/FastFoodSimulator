@@ -1,73 +1,48 @@
 ﻿import asyncio
 import json
 
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from fastapi.templating import Jinja2Templates
-from typing import Annotated
-from fastapi import Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from src.api.dependencies import publisher, get_user_service
-from src.events.simulation import SimulationContinuedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
-from src.infrastructure.redis.provider import RedisProvider
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+from src.api.dependencies import publisher
+from src.events.simulation import (
+    SimulationContinuedEvent,
+    SimulationPausedEvent,
+    SimulationStartedEvent,
+    SimulationUpdatedEvent,
+)
+from src.repositories.redis.provider import RedisProvider
+from src.repositories.redis.simulation_state_repository import SimulationStateRepository
 
-from src.schemas.user_schemas import UserAddSchema
+router = APIRouter(prefix="/simulation", tags=["simulation"])
 
-from src.services.users_service import UsersService
-
-templates = Jinja2Templates(directory="src/templates")
-
-router = APIRouter()
-
-# user_service = Annotated[
-#     UsersService,
-#     Depends(get_user_service)
-# ]
-
-@router.post("/users")
-async def create_user(
-    user: UserAddSchema,
-    user_service: Annotated[UsersService, Depends(get_user_service)]
-):
-    response = await user_service.add_user(user)
-    return response
-
-@router.get("/")
-async def home(request: Request):
-    return templates.TemplateResponse(request=request, name="home.html")
-
-@router.get("/simulation/1488")
-async def get_page(request: Request):
-    return templates.TemplateResponse(request=request, name="simulation_1488.html")
-
-@router.get("/simulation/state")
+@router.get("/state")
 async def get_state():
     repo = SimulationStateRepository()
     return await repo.get_state()
 
-@router.get("/api/simulation/settings")
+@router.get("/settings")
 async def get_sim_settings():
     repo = SimulationStateRepository()
     return await repo.get_workers_intervals()
 
-@router.post("/api/simulation/settings")
+@router.post("/settings")
 async def update_sim_settings(body: SimulationUpdatedEvent):
     await publisher.publish(event_name="simulation.updated", event=body)
     # repo = SimulationStateRepository()
     # await repo.update_workers_intervals(body.workers)
 
-@router.post("/api/simulation/start")
+@router.post("/start")
 async def start_simulation(body: SimulationStartedEvent):
     await publisher.publish(event_name="simulation.started", event=body)
     return {"status": "started"}
 
-@router.post("/api/simulation/continue")
+@router.post("/continue")
 async def continue_simulation():
     await publisher.publish(event_name="simulation.continued", event=SimulationContinuedEvent())
     return {"status": "continued"}
 
 
-@router.post("/api/simulation/pause")
+@router.post("/pause")
 async def pause_simulation():
     await publisher.publish(event_name="simulation.paused", event=SimulationPausedEvent())
     return {"status": "paused"}

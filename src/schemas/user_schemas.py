@@ -1,8 +1,16 @@
-﻿from pydantic import BaseModel
+﻿from typing import Annotated
 
-class UserAddSchema(BaseModel):
-    username: str
-    email: str
+from annotated_types import MaxLen, MinLen
+from pydantic import BaseModel, EmailStr
+
+
+class UserCreateSchema(BaseModel):
+    username: Annotated[str, MinLen(3), MaxLen(20)]
+    email: EmailStr
+    password: str
+
+class UserLoginSchema(BaseModel):
+    username: Annotated[str, MinLen(3), MaxLen(20)]
     password: str
 
 class UserResponseSchema(BaseModel):

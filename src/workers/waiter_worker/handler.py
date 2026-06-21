@@ -2,11 +2,10 @@
 import logging
 from time import monotonic
 
-import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
 from src.events.simulation import OrderDoneEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+from repositories.redis.simulation_state_repository import SimulationStateRepository
 
 
 class WaiterHandler:

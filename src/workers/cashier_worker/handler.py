@@ -12,7 +12,7 @@ from src.events.simulation import (
     SimulationStartedEvent,
     SimulationUpdatedEvent,
 )
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+from repositories.redis.simulation_state_repository import SimulationStateRepository
 
 
 class CashierHandler:

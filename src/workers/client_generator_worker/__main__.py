@@ -4,7 +4,7 @@ import logging
 import aio_pika
 from aio_pika import ExchangeType
 
-from src.infrastructure.redis.provider import RedisProvider
+from repositories.redis.provider import RedisProvider
 from src.workers.client_generator_worker.handler import ClientGeneratorHandler
 
 

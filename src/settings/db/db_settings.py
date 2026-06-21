@@ -3,7 +3,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ConfigDataBase(BaseSettings):
+class DBSettings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_HOST: str
@@ -25,6 +25,6 @@ class ConfigDataBase(BaseSettings):
 
 
 @lru_cache
-def get_postgres_config() -> ConfigDataBase:
-    return ConfigDataBase()
+def get_postgres_config() -> DBSettings:
+    return DBSettings()
 

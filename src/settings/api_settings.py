@@ -1,9 +1,18 @@
-﻿# from pydantic import Field
-# from pydantic_settings import BaseSettings, SettingsConfigDict
-#
-#
-# class APISettings(BaseSettings):
-#     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8-sig")
-#
-#     port: int = Field(validation_alias="API_PORT")
-#     host: str = Field(validation_alias="API_HOST")
+﻿from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ApiSettings(BaseSettings):
+    API_HOST: str
+    API_PORT: int
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+@lru_cache
+def get_settings() -> ApiSettings:
+    return ApiSettings()

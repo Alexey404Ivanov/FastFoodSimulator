@@ -5,7 +5,7 @@ import aio_pika
 from aio_pika import ExchangeType
 
 from src.workers.kitchen_worker.handler import KitchenWorker
-from src.infrastructure.redis.provider import RedisProvider
+from repositories.redis.provider import RedisProvider
 
 
 async def main():

@@ -13,7 +13,7 @@ from src.events.simulation import (
     SimulationUpdatedEvent,
 )
 
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
+from repositories.redis.simulation_state_repository import SimulationStateRepository
 
 class KitchenWorker:
     def __init__(self, exchange: AbstractRobustExchange):

@@ -5,7 +5,7 @@ import aio_pika
 from aio_pika import ExchangeType
 
 from src.workers.waiter_worker.handler import WaiterHandler
-from src.infrastructure.redis.provider import RedisProvider
+from repositories.redis.provider import RedisProvider
 
 async def main():
     await RedisProvider.init("redis://localhost:6379/0")

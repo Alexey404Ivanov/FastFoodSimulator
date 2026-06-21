@@ -8,8 +8,8 @@ class AbstractUserRepository(ABC):
     async def add_one(self, user: UserModel) -> int:
         pass
 
-    # @abstractmethod
-    # async def find_one():
-    #     pass
+    @abstractmethod
+    async def get_by_username(self, username: str) -> UserModel | None:
+        pass
 
 
