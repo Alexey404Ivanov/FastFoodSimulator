@@ -346,7 +346,6 @@ body {
     gap: calc(28px * var(--worker-scale));
     position: relative;
     align-content: start;
-    padding-bottom: calc(220px * var(--worker-scale));
 }
 
 .waiter-table-node {
@@ -354,10 +353,7 @@ body {
     display: grid;
     justify-items: center;
     gap: calc(10px * var(--worker-scale));
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translate(-50%, calc(-6px * var(--worker-scale)));
+    position: relative;
     z-index: 0;
 }
 

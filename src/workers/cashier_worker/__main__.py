@@ -17,7 +17,7 @@ async def main() -> None:
     try:
         channel = await connection.channel()
 
-        queue = await channel.declare_queue("cashier.queue", durable=False, auto_delete=True)
+        queue = await channel.declare_queue("cashier.queue", durable=True, auto_delete=True)
         exchange = await channel.declare_exchange(
             name="simulation.events.exchange",
             type=ExchangeType.TOPIC,
