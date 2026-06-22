@@ -17,9 +17,9 @@ router = APIRouter()
 async def home(request: Request):
     return templates.TemplateResponse(request=request, name="home.html")
 
-@router.get("/simulation/1488")
+@router.get("/simulation/0")
 async def get_page(request: Request):
-    return templates.TemplateResponse(request=request, name="simulation_1488.html")
+    return templates.TemplateResponse(request=request, name="simulation_0.html")
 
 @router.get("/simulation/state")
 async def get_state():
@@ -54,8 +54,8 @@ async def pause_simulation():
     return {"status": "paused"}
 
 
-@router.websocket("/api/simulation/1488/events")
-async def simulation_ws(websocket: WebSocket, simulation_id: int=1488):
+@router.websocket("/api/simulation/0/events")
+async def simulation_ws(websocket: WebSocket, simulation_id: int=0):
     await websocket.accept()
     redis = await RedisProvider.get_client()
 

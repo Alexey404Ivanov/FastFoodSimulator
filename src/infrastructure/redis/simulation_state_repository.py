@@ -13,14 +13,14 @@ class SimulationStateRepository:
         self.redis = RedisProvider.get_client()
 
     async def set_worker_interval(self, worker_name: str, interval: int):
-        await self.redis.set(f"simulation:{1488}:{worker_name}_interval", interval)
+        await self.redis.set(f"simulation:{0}:{worker_name}_interval", interval)
 
 
     async def get_workers_intervals(self):
         workers_intervals = {}
 
         for worker in ["client", "cashier", "kitchen", "waiter"]:
-            worker_interval = await self.redis.get(f"simulation:{1488}:{worker}_interval")
+            worker_interval = await self.redis.get(f"simulation:{0}:{worker}_interval")
             workers_intervals[f"{worker}_interval"] = worker_interval
 
         return workers_intervals
@@ -29,7 +29,7 @@ class SimulationStateRepository:
         for worker_data in request:
             await self.set_worker_interval(worker_data.name, worker_data.interval)
             await self.redis.publish(
-                f"simulation:{1488}:events",
+                f"simulation:{0}:events",
                 json.dumps(
                     {
                         "type": "worker_interval_updated",
@@ -42,9 +42,8 @@ class SimulationStateRepository:
             )
 
     async def get_state(self):
-        base_key = f"simulation:{1488}"
+        base_key = f"simulation:{0}"
 
-        # Запускаем все запросы параллельно
         status_task = self.redis.hget(base_key, "status")
         worked_time_task = self.redis.hget(base_key, "worked_time")
         started_at_task = self.redis.hget(base_key, "started_at")
@@ -92,23 +91,23 @@ class SimulationStateRepository:
 
         if status == "running":
             started_at = datetime.now(UTC)
-            await self.redis.hset(f"simulation:{1488}", "started_at", started_at.isoformat())
+            await self.redis.hset(f"simulation:{0}", "started_at", started_at.isoformat())
         else:
-            started_at = await self.redis.hget(f"simulation:{1488}", "started_at")
-            worked_time = await self.redis.hget(f"simulation:{1488}", "worked_time")
+            started_at = await self.redis.hget(f"simulation:{0}", "started_at")
+            worked_time = await self.redis.hget(f"simulation:{0}", "worked_time")
 
             started_at = datetime.fromisoformat(started_at)
 
             worked_time = timedelta(seconds=float(worked_time))
 
             worked_time += datetime.now(UTC) - started_at
-            await self.redis.hset(f"simulation:{1488}", "worked_time", str(worked_time.total_seconds()))
+            await self.redis.hset(f"simulation:{0}", "worked_time", str(worked_time.total_seconds()))
 
-        await self.redis.hset(f"simulation:{1488}", "status", status)
-        started_at_time = await self.redis.hget(f"simulation:{1488}", "started_at")
-        time = await self.redis.hget(f"simulation:{1488}", "worked_time")
+        await self.redis.hset(f"simulation:{0}", "status", status)
+        started_at_time = await self.redis.hget(f"simulation:{0}", "started_at")
+        time = await self.redis.hget(f"simulation:{0}", "worked_time")
         await self.redis.publish(
-            f"simulation:{1488}:events",
+            f"simulation:{0}:events",
             json.dumps({
                 "type": "simulation_status_updated",
                 "data": {
@@ -123,10 +122,10 @@ class SimulationStateRepository:
         if worker_name not in self.QUEUE_NAMES:
             return
 
-        await self.redis.rpush(f"simulation:{1488}:{worker_name}:queue", entity_id)
+        await self.redis.rpush(f"simulation:{0}:{worker_name}:queue", entity_id)
 
         await self.redis.publish(
-            f"simulation:{1488}:events",
+            f"simulation:{0}:events",
             json.dumps({
                 "type": "worker_queue_pushed",
                 "data": {
@@ -140,29 +139,29 @@ class SimulationStateRepository:
         if worker_name not in self.QUEUE_NAMES:
             return
 
-        await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", "")
+        await self.redis.hset(f"simulation:{0}:{worker_name}", "doing", "")
 
         await self.redis.publish(
-            f"simulation:{1488}:events",
+            f"simulation:{0}:events",
             json.dumps({
                 "type": "worker_finished_job",
                 "data": {
-                    "worker_name": worker_name
-                }
-            })
+                    "worker_name": worker_name,
+                },
+            }),
         )
 
     async def set_worker_starting_job(self, worker_name: str):
         if worker_name not in self.QUEUE_NAMES:
             return
 
-        popped_from_queue = await self.redis.lpop(f"simulation:{1488}:{worker_name}:queue")
+        popped_from_queue = await self.redis.lpop(f"simulation:{0}:{worker_name}:queue")
 
-        await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", popped_from_queue)
+        await self.redis.hset(f"simulation:{0}:{worker_name}", "doing", popped_from_queue)
         started_at = datetime.now(UTC)
-        await self.redis.set(f"simulation:{1488}:{worker_name}_started_work_at", started_at.isoformat())
+        await self.redis.set(f"simulation:{0}:{worker_name}_started_work_at", started_at.isoformat())
         await self.redis.publish(
-            f"simulation:{1488}:events",
+            f"simulation:{0}:events",
             json.dumps(
                 {
                     "type": "worker_started_job",
@@ -170,35 +169,9 @@ class SimulationStateRepository:
                         "worker_name": worker_name,
                         "started_work_at": started_at.isoformat()
                     },
-                }
+                },
             ),
         )
 
-        # if worker_name == "waiter":
-        #     await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", popped_from_queue)
-        #     started_at = datetime.now(UTC)
-        #     await self.redis.set(f"simulation:{1488}:waiter_started_work_at", started_at.isoformat())
-        #     await self.redis.publish(
-        #         f"simulation:{1488}:events",
-        #         json.dumps({
-        #             "type": "worker_started_job",
-        #             "data": {
-        #                 "worker_name": worker_name,
-        #                 "waiter_started_work_at": started_at.isoformat()
-        #             }
-        #         }),
-        #     )
-        #
-        #
-        # else:
-        #     await self.redis.hset(f"simulation:{1488}:{worker_name}", "doing", popped_from_queue)
-        #     await self.redis.publish(
-        #         f"simulation:{1488}:events",
-        #         json.dumps({
-        #             "type": "worker_started_job",
-        #             "data": {
-        #                 "worker_name": worker_name
-        #             }
-        #         }),
-        #     )
+
 

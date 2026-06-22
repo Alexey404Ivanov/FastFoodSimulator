@@ -33,7 +33,7 @@ class CashierHandler:
 
             if routing_key == "simulation.started":
                 event = SimulationStartedEvent.model_validate_json(
-                    message.body.decode()
+                    message.body.decode(),
                 )
                 await self.redis_repo.set_status("running")
                 self.cashier_interval_seconds = event.cashier_interval_seconds
@@ -114,7 +114,7 @@ class CashierHandler:
         event = OrderCreatedEvent(order_id=order_id)
         await self.exchange.publish(
             aio_pika.Message(
-                body=event.model_dump_json().encode()
+                body=event.model_dump_json().encode(),
             ),
-            routing_key="order.created"
+            routing_key="order.created",
         )

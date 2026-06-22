@@ -59,7 +59,7 @@ simulationForm.addEventListener("submit", async (event) => {
         console.error("Request failed:", error);
     }
 
-    window.location.href="/simulation/1488"
+    window.location.href="/simulation/0"
 });
 
 function setSimulationFormError(message) {
