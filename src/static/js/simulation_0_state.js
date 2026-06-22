@@ -1,4 +1,4 @@
-const simulationId = 0
+const simulationId = Number(window.simulationId)
 const payloadStorageKey = `simulation:${simulationId}:payload`
 const sessionStartedKey = `simulation:${simulationId}:started`
 const waiterProgressStorageKey = `simulation:${simulationId}:waiter-progress`

@@ -1,5 +1,5 @@
 async function updateSimulationStatus(action) {
-  const endpoint = `/api/simulation/${action}`
+  const endpoint = `/api/simulation/${simulationId}/${action}`
 
   try {
     const response = await fetch(endpoint, {
@@ -32,7 +32,7 @@ async function openSimulationSettingsModal() {
   simulationSettingsModal.hidden = false
 
   try {
-    const response = await fetch("/api/simulation/settings")
+    const response = await fetch(`/api/simulation/${simulationId}/settings`)
 
     if (!response.ok) {
       throw new Error(`Request failed with status ${response.status}`)
@@ -109,7 +109,7 @@ async function submitSimulationSettings() {
   setSimulationSettingsLoading(true, "Сохранение...")
 
   try {
-    const response = await fetch("/api/simulation/settings", {
+    const response = await fetch(`/api/simulation/${simulationId}/settings`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

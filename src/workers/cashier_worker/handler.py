@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 from time import monotonic
 
@@ -8,6 +8,7 @@ from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 from src.contracts.simulation import (
     ClientArrivedEvent,
     OrderCreatedEvent,
+    SimulationContinuedEvent,
     SimulationPausedEvent,
     SimulationStartedEvent,
     SimulationUpdatedEvent,
@@ -15,106 +16,113 @@ from src.contracts.simulation import (
 from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
 
 
-class CashierHandler:
-    def __init__(self, exchange: AbstractRobustExchange):
-        self.redis_repo = SimulationStateRepository()
-        self.exchange: AbstractRobustExchange = exchange
-        self.logger = logging.getLogger("CashierHandler")
-        self.client_queue = asyncio.Queue()
-        self.work_task: asyncio.Task | None = None
-        self.current_order_id = None
-        self.cashier_interval_seconds = None
-        self.remaining_time = None
+class CashierRuntime:
+    def __init__(self, event: SimulationStartedEvent, exchange: AbstractRobustExchange):
+        self.simulation_id = event.simulation_id
+        self.exchange = exchange
+        self.repo = SimulationStateRepository(event.simulation_id)
+        self.queue: asyncio.Queue[int] = asyncio.Queue()
+        self.task: asyncio.Task | None = None
+        self.current_order_id: int | None = None
+        self.interval_seconds = event.cashier_interval_seconds
+        self.remaining_time = float(self.interval_seconds)
+        self.running = True
 
-    async def handle_message(self, message: AbstractIncomingMessage):
-        async with message.process():
-            routing_key = message.routing_key
-            self.logger.info(f"Message \"{routing_key}\" arrived")
+    def ensure_running(self) -> None:
+        if self.running and (self.task is None or self.task.done()):
+            self.task = asyncio.create_task(self.work_loop(), name=f"cashier-{self.simulation_id}")
 
-            if routing_key == "simulation.started":
-                event = SimulationStartedEvent.model_validate_json(
-                    message.body.decode(),
-                )
-                await self.redis_repo.set_status("running")
-                self.cashier_interval_seconds = event.cashier_interval_seconds
-                await self.redis_repo.set_worker_interval(worker_name="cashier", interval=event.cashier_interval_seconds)
-                self.remaining_time = self.cashier_interval_seconds
+    async def enqueue(self, client_id: int) -> None:
+        await self.repo.push_to_worker_queue("cashier", client_id)
+        await self.queue.put(client_id)
+        self.ensure_running()
 
-            elif routing_key == "simulation.paused":
-                event = SimulationPausedEvent.model_validate_json(message.body.decode())
-                await self.redis_repo.set_status("paused")
-                await self.pause_work()
-
-            elif routing_key == "simulation.continued":
-                await self.redis_repo.set_status("running")
-                await self.start_or_resume_work()
-
-            elif routing_key == "client.arrived":
-                event = ClientArrivedEvent.model_validate_json(message.body.decode())
-
-                await self.redis_repo.push_to_worker_queue(worker_name="cashier", entity_id=event.client_id)
-                await self.client_queue.put(event.client_id)
-
-                self.logger.info(f"Client #{event.client_id} put in queue")
-
-                if self.work_task is None or self.work_task.done():
-                    self.work_task = asyncio.create_task(self.work_loop())
-
-            elif routing_key == "simulation.updated":
-                event = SimulationUpdatedEvent.model_validate_json(message.body.decode())
-                worker_names = (worker_data.name for worker_data in event.workers)
-                if "cashier" not in worker_names:
-                    return
-                self.cashier_interval_seconds = next(
-                    worker_data.interval for worker_data in event.workers if worker_data.name == "cashier"
-                )
-                self.logger.info(f"Interval updated: {self.cashier_interval_seconds}")
-                await self.redis_repo.set_worker_interval(worker_name="cashier", interval=self.cashier_interval_seconds)
-
-    async def start_or_resume_work(self):
-        self.logger.info("Start or resume work")
-        self.work_task = asyncio.create_task(
-            self.work_loop()
-        )
-
-    async def pause_work(self):
-        if self.work_task is None:
-            self.logger.info(f"Pause non-working cashier")
+    async def pause(self) -> None:
+        self.running = False
+        if self.task is None or self.task.done():
             return
-        self.work_task.cancel()
+        self.task.cancel()
         try:
-            await self.work_task
+            await self.task
         except asyncio.CancelledError:
-            self.logger.info(f"Pause work with remaining time - {self.remaining_time} s")
+            pass
 
+    def resume(self) -> None:
+        self.running = True
+        self.ensure_running()
 
-    async def work_loop(self):
-        while True:
+    async def work_loop(self) -> None:
+        while self.running:
             if self.current_order_id is None:
-                self.current_order_id = await self.client_queue.get()
-                await self.redis_repo.set_worker_starting_job(worker_name="cashier")
+                self.current_order_id = await self.queue.get()
+                await self.repo.set_worker_starting_job("cashier")
 
             started_at = monotonic()
-
             try:
                 await asyncio.sleep(self.remaining_time)
-
-                self.logger.info(f"Order #{self.current_order_id} created")
-                await self._publish(self.current_order_id)
-                await self.redis_repo.set_worker_finished_job(worker_name="cashier")
-                self.current_order_id = None
-                self.remaining_time = self.cashier_interval_seconds
-
             except asyncio.CancelledError:
-                elapsed = monotonic() - started_at
-                self.remaining_time = max(0, self.remaining_time - elapsed)
+                self.remaining_time = max(0, self.remaining_time - (monotonic() - started_at))
                 raise
 
-    async def _publish(self, order_id: int):
-        event = OrderCreatedEvent(order_id=order_id)
-        await self.exchange.publish(
-            aio_pika.Message(
-                body=event.model_dump_json().encode(),
-            ),
-            routing_key="order.created",
-        )
+            event = OrderCreatedEvent(
+                simulation_id=self.simulation_id,
+                order_id=self.current_order_id,
+            )
+            await self.exchange.publish(
+                aio_pika.Message(
+                    body=event.model_dump_json().encode(),
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                ),
+                routing_key="order.created",
+            )
+            await self.repo.set_worker_finished_job("cashier")
+            self.current_order_id = None
+            self.remaining_time = float(self.interval_seconds)
+
+
+class CashierHandler:
+    def __init__(self, exchange: AbstractRobustExchange):
+        self.exchange = exchange
+        self.logger = logging.getLogger("CashierHandler")
+        self.simulations: dict[int, CashierRuntime] = {}
+
+    async def handle_message(self, message: AbstractIncomingMessage) -> None:
+        async with message.process():
+            routing_key = message.routing_key
+            if routing_key == "simulation.started":
+                event = SimulationStartedEvent.model_validate_json(message.body)
+                previous = self.simulations.get(event.simulation_id)
+                if previous is not None:
+                    await previous.pause()
+                self.simulations[event.simulation_id] = CashierRuntime(event, self.exchange)
+                return
+
+            if routing_key == "simulation.paused":
+                event = SimulationPausedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is not None:
+                    await runtime.pause()
+                return
+
+            if routing_key == "simulation.continued":
+                event = SimulationContinuedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is not None:
+                    runtime.resume()
+                return
+
+            if routing_key == "client.arrived":
+                event = ClientArrivedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is not None:
+                    await runtime.enqueue(event.client_id)
+                return
+
+            if routing_key == "simulation.updated":
+                event = SimulationUpdatedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is None:
+                    return
+                update = next((item for item in event.workers if item.name == "cashier"), None)
+                if update is not None:
+                    runtime.interval_seconds = update.interval

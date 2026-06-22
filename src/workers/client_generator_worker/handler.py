@@ -5,88 +5,108 @@ from time import monotonic
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustExchange
 
-from src.infrastructure.redis.simulation_state_repository import SimulationStateRepository
-from src.contracts.simulation import ClientArrivedEvent, SimulationPausedEvent, SimulationStartedEvent, SimulationUpdatedEvent
+from src.contracts.simulation import (
+    ClientArrivedEvent,
+    SimulationContinuedEvent,
+    SimulationPausedEvent,
+    SimulationStartedEvent,
+    SimulationUpdatedEvent,
+)
 
-class ClientGeneratorHandler:
-    def __init__(self, exchange: AbstractRobustExchange):
-        self.redis_repo = SimulationStateRepository()
-        self.exchange: AbstractRobustExchange = exchange
-        self.logger = logging.getLogger("ClientGeneratorHandler")
-        self.generator_task: asyncio.Task | None = None
+
+class ClientGeneratorRuntime:
+    def __init__(self, event: SimulationStartedEvent, exchange: AbstractRobustExchange):
+        self.simulation_id = event.simulation_id
+        self.exchange = exchange
+        self.interval_seconds = event.client_interval_seconds
+        self.remaining_time = float(self.interval_seconds)
         self.current_client_id = 1
-        self.client_interval_seconds = None
-        self.remaining_time = None
+        self.running = True
+        self.task: asyncio.Task | None = None
 
-    async def handle_message(self, message: AbstractIncomingMessage):
-        async with message.process():
-            routing_key = message.routing_key
-            self.logger.info(f"Message \"{routing_key}\" arrived")
+    def ensure_running(self) -> None:
+        if self.running and (self.task is None or self.task.done()):
+            self.task = asyncio.create_task(
+                self.generate(),
+                name=f"client-generator-{self.simulation_id}",
+            )
 
-            if routing_key == "simulation.started":
-                event = SimulationStartedEvent.model_validate_json(
-                    message.body.decode()
-                )
-                self.client_interval_seconds = event.client_interval_seconds
-                await self.redis_repo.set_worker_interval(worker_name="client", interval=event.client_interval_seconds)
-                self.remaining_time = self.client_interval_seconds
-                await self.start_or_resume_generation()
-
-            elif routing_key == "simulation.paused":
-                event = SimulationPausedEvent.model_validate_json(message.body.decode())
-                await self.pause_generation()
-
-            elif routing_key == "simulation.continued":
-                await self.start_or_resume_generation()
-
-            elif routing_key == "simulation.updated":
-                event = SimulationUpdatedEvent.model_validate_json(message.body.decode())
-                worker_names = (worker_data.name for worker_data in event.workers)
-                if "client" not in worker_names:
-                    return
-                self.client_interval_seconds = next(
-                    worker_data.interval for worker_data in event.workers if worker_data.name == "client"
-                )
-                self.logger.info(f"Interval updated: {self.client_interval_seconds}")
-                await self.redis_repo.set_worker_interval(worker_name="client", interval=self.client_interval_seconds)
-
-    async def start_or_resume_generation(self):
-        self.logger.info("Start or continue generation")
-        self.generator_task = asyncio.create_task(
-            self.generate()
-        )
-
-    async def pause_generation(self):
-        # self.logger.info("Pause generation")
-        self.generator_task.cancel()
+    async def pause(self) -> None:
+        self.running = False
+        if self.task is None or self.task.done():
+            return
+        self.task.cancel()
         try:
-            await self.generator_task
+            await self.task
         except asyncio.CancelledError:
-            self.logger.info(f"Pause generation with remaining time - {self.remaining_time} s")
+            pass
 
+    def resume(self) -> None:
+        self.running = True
+        self.ensure_running()
 
-    async def generate(self):
-        while True:
+    async def generate(self) -> None:
+        while self.running:
             started_at = monotonic()
             try:
                 await asyncio.sleep(self.remaining_time)
-                self.logger.info(f"Client #{self.current_client_id} arrived")
-                await self._publish()
-                self.current_client_id += 1
-                self.remaining_time = self.client_interval_seconds
-
             except asyncio.CancelledError:
-                elapsed = monotonic() - started_at
-                self.remaining_time -= elapsed
+                self.remaining_time = max(0, self.remaining_time - (monotonic() - started_at))
                 raise
 
+            event = ClientArrivedEvent(
+                simulation_id=self.simulation_id,
+                client_id=self.current_client_id,
+            )
+            await self.exchange.publish(
+                aio_pika.Message(
+                    body=event.model_dump_json().encode(),
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                ),
+                routing_key="client.arrived",
+            )
+            self.current_client_id += 1
+            self.remaining_time = float(self.interval_seconds)
 
 
-    async def _publish(self):
-        event = ClientArrivedEvent(client_id=self.current_client_id)
-        await self.exchange.publish(
-            aio_pika.Message(
-                body=event.model_dump_json().encode()
-            ),
-            routing_key="client.arrived"
-        )
+class ClientGeneratorHandler:
+    def __init__(self, exchange: AbstractRobustExchange):
+        self.exchange = exchange
+        self.logger = logging.getLogger("ClientGeneratorHandler")
+        self.simulations: dict[int, ClientGeneratorRuntime] = {}
+
+    async def handle_message(self, message: AbstractIncomingMessage) -> None:
+        async with message.process():
+            routing_key = message.routing_key
+            if routing_key == "simulation.started":
+                event = SimulationStartedEvent.model_validate_json(message.body)
+                previous = self.simulations.get(event.simulation_id)
+                if previous is not None:
+                    await previous.pause()
+                runtime = ClientGeneratorRuntime(event, self.exchange)
+                self.simulations[event.simulation_id] = runtime
+                runtime.ensure_running()
+                return
+
+            if routing_key == "simulation.paused":
+                event = SimulationPausedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is not None:
+                    await runtime.pause()
+                return
+
+            if routing_key == "simulation.continued":
+                event = SimulationContinuedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is not None:
+                    runtime.resume()
+                return
+
+            if routing_key == "simulation.updated":
+                event = SimulationUpdatedEvent.model_validate_json(message.body)
+                runtime = self.simulations.get(event.simulation_id)
+                if runtime is None:
+                    return
+                update = next((item for item in event.workers if item.name == "client"), None)
+                if update is not None:
+                    runtime.interval_seconds = update.interval

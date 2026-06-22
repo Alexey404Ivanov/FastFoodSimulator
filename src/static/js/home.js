@@ -51,15 +51,19 @@ simulationForm.addEventListener("submit", async (event) => {
             throw new Error(`HTTP error: ${response.status}`);
         }
 
-        const data = await response.json().catch(() => null);
+        const data = await response.json();
+
+        if (!Number.isInteger(data.simulation_id)) {
+            throw new Error("Server did not return simulation_id");
+        }
 
         console.log("Server response:", data);
+        window.location.href = `/simulation/${data.simulation_id}`;
 
     } catch (error) {
         console.error("Request failed:", error);
+        setSimulationFormError("Не удалось запустить симуляцию");
     }
-
-    window.location.href="/simulation/0"
 });
 
 function setSimulationFormError(message) {
